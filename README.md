@@ -42,4 +42,4 @@ Hiring business consultants can be **expensive** and often out of reach for smal
    git clone https://github.com/your-repo/consulting-chatbot.git
    cd frontend
    npm i
-   npm run dev```
+   npm run dev
