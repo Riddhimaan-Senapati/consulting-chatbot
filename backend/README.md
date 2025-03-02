@@ -1,0 +1,1 @@
+This is the backend of our code. We are using FastAPI to create our API routes.
