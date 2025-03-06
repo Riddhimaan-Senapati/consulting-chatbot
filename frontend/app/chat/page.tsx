@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Bot, Send, Home } from "lucide-react";
 import Link from 'next/link';
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   type: 'user' | 'bot';
@@ -67,7 +68,7 @@ export default function Chat() {
                     : 'bg-secondary text-secondary-foreground'
                 }`}
               >
-                {message.content}
+                <ReactMarkdown>{message.content}</ReactMarkdown>
               </div>
             </div>
           ))}
@@ -76,12 +77,18 @@ export default function Chat() {
         {/* Input Area */}
         <div className="border-t p-4">
           <div className="flex gap-4">
-            <Input
+            <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your message..."
-              onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-              className="flex-1"
+              placeholder="Type your message... (Markdown supported)"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              className="flex-1 min-h-[60px] p-2 rounded-md border"
+              rows={2}
             />
             <Button onClick={handleSend}>
               <Send className="h-4 w-4" />
