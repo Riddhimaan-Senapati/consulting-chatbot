@@ -1,4 +1,9 @@
-This is the backend of our code. We are using FastAPI to create our API routes.
+This is the backend of our code. We are using FastAPI to create our API routes. 
+
+Here are the the [FastAPI docs](https://fastapi.tiangolo.com/)
+Here's an example using both [FastAPI+MongoDB](https://www.mongodb.com/developer/languages/python/python-quickstart-fastapi/)
+
+[FastAPI in the MongoDB docs](https://www.mongodb.com/developer/technologies/fastapi/)
 
 ## Installation and usage
 
