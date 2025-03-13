@@ -1,5 +1,6 @@
 # Frontend Code
-This is the frontend of our code built using NextJs
+This is the frontend of our code built using Next.Js.
+Here are the the [Next.Js docs](https://nextjs.org/docs)
 
 ## Installation and usage
 
