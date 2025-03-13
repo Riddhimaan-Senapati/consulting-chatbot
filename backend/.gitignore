@@ -1,0 +1,6 @@
+#ignore virtual environments
+.venv
+#ignore .env
+.env
+#ignore pycache
+__pycache__
