@@ -35,11 +35,24 @@ Hiring business consultants can be **expensive** and often out of reach for smal
   - Offers **actionable recommendations** based on data-driven insights.  
   - Enhances strategic planning and risk assessment.  
 
+Here's the updated Markdown code with the backend and frontend README links inserted as text:
+
+
 ## Installation & Usage
 
 1. Clone the repository:
    ```sh
    git clone https://github.com/Riddhimaan-Senapati/consulting-chatbot.git
-   cd frontend
-   npm i
-   npm run dev
+   ```
+
+2. Navigate to the backend directory and follow the instructions in the [backend README](https://github.com/Riddhimaan-Senapati/consulting-chatbot/blob/main/backend/README.md):
+   ```sh
+   cd consulting-chatbot/backend
+   # Follow the instructions in the backend README
+   ```
+
+3. Open another terminal window, navigate to the frontend directory, and follow the instructions in the [frontend README](https://github.com/Riddhimaan-Senapati/consulting-chatbot/blob/main/frontend/README.md):
+   ```sh
+   cd consulting-chatbot/frontend
+   # Follow the instructions in the frontend README
+   ```
