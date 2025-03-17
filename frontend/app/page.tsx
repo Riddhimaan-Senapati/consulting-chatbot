@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Bot, BarChart3, Brain, LineChart, LogIn, UserPlus } from "lucide-react";
 import Link from 'next/link';
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 export default function Home() {
   return (
@@ -14,7 +15,8 @@ export default function Home() {
             <Bot className="h-8 w-8 text-primary" />
             <span className="text-2xl font-bold">AnalyticAI</span>
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
+            <ThemeToggle />
             <Button variant="outline">
               <LogIn className="mr-2 h-4 w-4" />
               Login

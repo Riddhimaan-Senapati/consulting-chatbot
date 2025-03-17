@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Bot, Send, Home } from "lucide-react";
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 interface Message {
   type: 'user' | 'bot';
@@ -44,12 +45,15 @@ export default function Chat() {
           <Bot className="h-8 w-8 text-primary" />
           <span className="text-2xl font-bold">AnalyticAI</span>
         </div>
-        <Link href="/">
-          <Button variant="outline" className="w-full">
-            <Home className="mr-2 h-4 w-4" />
-            Back to Home
-          </Button>
-        </Link>
+        <div className="flex flex-col gap-4">
+          <ThemeToggle />
+          <Link href="/">
+            <Button variant="outline" className="w-full">
+              <Home className="mr-2 h-4 w-4" />
+              Back to Home
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Main Chat Area */}
