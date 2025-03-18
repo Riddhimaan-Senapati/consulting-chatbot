@@ -2,8 +2,18 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List, Tuple
 from graph import initialize_workflow
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Update with your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 analysis_chain = initialize_workflow()
 
 class AnalysisRequest(BaseModel):
