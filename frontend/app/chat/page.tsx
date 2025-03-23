@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Bot, Send, Home } from "lucide-react";
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
@@ -144,9 +143,15 @@ export default function Chat() {
                         th: ({node, ...props}) => <th className="border border-border p-2 text-left font-semibold" {...props} />,
                         td: ({node, ...props}) => <td className="border border-border p-2 whitespace-normal break-words" {...props} />,
                         blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-primary/30 pl-4 italic my-2" {...props} />,
-                        code: ({node, inline, className, children, ...props}) => {
+                        code: ({node, className, children, ...props}: {
+                          node?: any;
+                          className?: string;
+                          children?: React.ReactNode;
+                          [key: string]: any;
+                        }) => {
                           const match = /language-(\w+)/.exec(className || '');
-                          return !inline ? (
+                          const isInline = !match && !className;
+                          return !isInline ? (
                             <div className="overflow-auto my-2 max-w-full rounded bg-muted/70 p-1">
                               <pre className={`${match ? 'language-' + match[1] : ''} text-sm p-2`}>
                                 <code className={className} {...props}>{children}</code>
