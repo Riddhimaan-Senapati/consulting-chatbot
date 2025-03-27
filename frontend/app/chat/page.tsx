@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Bot, Send, Home } from "lucide-react";
+import { Bot, Send, Home, Mic, MicOff } from "lucide-react";
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
 interface Message {
   type: 'user' | 'bot';
@@ -29,6 +30,42 @@ export default function Chat() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+
+  const {
+    transcript,
+    listening,
+    resetTranscript,
+    browserSupportsSpeechRecognition,
+    isMicrophoneAvailable
+  } = useSpeechRecognition();
+
+  // Update input field with transcript when voice input changes
+  useEffect(() => {
+    if (transcript) {
+      setInput(transcript);
+    }
+  }, [transcript]);
+
+  // Toggle voice recognition
+  const toggleListening = () => {
+    if (listening) {
+      SpeechRecognition.stopListening();
+      setIsListening(false);
+    } else {
+      SpeechRecognition.startListening({ continuous: true, language: 'en-US' });
+      setIsListening(true);
+      resetTranscript();
+    }
+  };
+
+  // Handle voice send
+  const handleVoiceSend = () => {
+    if (transcript.trim()) {
+      handleSend();
+      resetTranscript();
+    }
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -199,12 +236,50 @@ export default function Chat() {
               }}
               className="flex-1 min-h-[60px] p-2 rounded-md border resize-none"
               rows={2}
-              disabled={isLoading}
             />
-            <Button onClick={handleSend} disabled={isLoading} className="flex-shrink-0">
-              <Send className="h-4 w-4" />
-            </Button>
+            <div className="flex flex-col gap-2">
+              {browserSupportsSpeechRecognition && (
+                <Button
+                  onClick={toggleListening}
+                  variant="outline"
+                  className={`p-2 ${listening ? 'bg-primary text-primary-foreground' : ''}`}
+                  title={listening ? "Stop voice input" : "Start voice input"}
+                >
+                  {listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                </Button>
+              )}
+              <Button 
+                onClick={handleSend} 
+                className="p-2"
+                disabled={isLoading}
+              >
+                <Send className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
+          {listening && (
+            <div className="mt-2 text-sm text-muted-foreground max-w-[1000px] mx-auto flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+                <span>Listening... {transcript && `"${transcript}"`}</span>
+              </div>
+              {transcript && (
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  onClick={handleVoiceSend} 
+                  className="text-xs"
+                >
+                  Send voice message
+                </Button>
+              )}
+            </div>
+          )}
+          {!browserSupportsSpeechRecognition && (
+            <div className="mt-2 text-sm text-muted-foreground max-w-[1000px] mx-auto">
+              <span>Voice input is not supported in your browser. Try using Chrome for the best experience.</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
