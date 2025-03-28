@@ -14,6 +14,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Initialize the workflow with the improved LangGraph that includes source links at the bottom of responses
 analysis_chain = initialize_workflow()
 
 class AnalysisRequest(BaseModel):
@@ -32,7 +33,7 @@ async def analyze(request: AnalysisRequest):
     }
     result = analysis_chain.invoke(state)
     return {
-        "response": result["messages"][-1][1],
+        "response": result["messages"][-1][1],  # Response now includes source links
         "full_history": result["messages"]
     }
 
