@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Bot, Send, Home, Mic, MicOff } from "lucide-react";
+import { Bot, Send, Home, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -13,6 +13,7 @@ import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognitio
 interface Message {
   type: 'user' | 'bot';
   content: string;
+  isSpeaking?: boolean;
 }
 
 // API response interface to match backend structure
@@ -22,15 +23,18 @@ interface AnalysisResponse {
 }
 
 export default function Chat() {
+  const [mounted, setMounted] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       type: 'bot',
-      content: 'Hello! I can help you with SWOT, TOWS, and PESTLE analysis. What would you like to analyze today?'
+      content: 'Hello! I can help you with SWOT, TOWS, and PESTLE analysis. What would you like to analyze today?',
+      isSpeaking: false
     }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
 
   const {
     transcript,
@@ -107,19 +111,116 @@ export default function Chat() {
       // Add bot response to chat
       setMessages(prev => [...prev, {
         type: 'bot',
-        content: data.response
+        content: data.response,
+        isSpeaking: false
       }]);
     } catch (error) {
       console.error('Error calling API:', error);
       // Add error message to chat
       setMessages(prev => [...prev, {
         type: 'bot',
-        content: "Sorry, I encountered an error while processing your request. Please try again."
+        content: "Sorry, I encountered an error while processing your request. Please try again.",
+        isSpeaking: false
       }]);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const toggleSpeech = (index: number) => {
+    // If this message is already speaking, stop it
+    if (speakingIndex === index) {
+      window.speechSynthesis.cancel();
+      setSpeakingIndex(null);
+      
+      setMessages(prevMessages => {
+        const newMessages = [...prevMessages];
+        // Make sure to mark all messages as not speaking
+        newMessages.forEach(msg => {
+          msg.isSpeaking = false;
+        });
+        return newMessages;
+      });
+      return;
+    }
+    
+    // Otherwise, stop any current speech and start this one
+    window.speechSynthesis.cancel();
+    
+    setMessages(prevMessages => {
+      const newMessages = [...prevMessages];
+      
+      // Mark all messages as not speaking
+      newMessages.forEach(msg => {
+        msg.isSpeaking = false;
+      });
+      
+      // Mark this message as speaking
+      const message = newMessages[index];
+      message.isSpeaking = true;
+      
+      // Create and configure the utterance
+      const utterance = new SpeechSynthesisUtterance(message.content);
+      
+      // Try to get a good voice
+      const voices = window.speechSynthesis.getVoices();
+      if (voices && voices.length > 0) {
+        // Try to find a good English voice
+        const preferredVoice = voices.find(voice => 
+          voice.lang === 'en-US' || 
+          voice.name.includes('English') ||
+          voice.name.includes('Google')
+        );
+        utterance.voice = preferredVoice || voices[0];
+      }
+      
+      // Set rate and pitch to normal values
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      
+      // When speech ends, update the speaking state
+      utterance.onend = () => {
+        setSpeakingIndex(null);
+        setMessages(prev => {
+          const updatedMessages = [...prev];
+          updatedMessages.forEach(msg => {
+            msg.isSpeaking = false;
+          });
+          return updatedMessages;
+        });
+      };
+      
+      // Handle errors
+      utterance.onerror = () => {
+        setSpeakingIndex(null);
+        setMessages(prev => {
+          const updatedMessages = [...prev];
+          updatedMessages.forEach(msg => {
+            msg.isSpeaking = false;
+          });
+          return updatedMessages;
+        });
+      };
+      
+      // Start speaking and update the speaking index
+      window.speechSynthesis.speak(utterance);
+      setSpeakingIndex(index);
+      
+      return newMessages;
+    });
+  };
+
+  // Mark component as mounted to avoid SSR hydration issues
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Only render the full component after client-side hydration
+  if (!mounted) {
+    return <div className="flex h-screen items-center justify-center bg-background">
+      <div className="animate-pulse">Loading...</div>
+    </div>;
+  }
 
   return (
     <div className="flex h-screen bg-background">
@@ -204,6 +305,23 @@ export default function Chat() {
                       {message.content}
                     </ReactMarkdown>
                   </div>
+                  {message.type === 'bot' && (
+                    <div className="flex justify-end mt-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleSpeech(index)}
+                        className="p-1"
+                        title={message.isSpeaking ? "Stop speaking" : "Speak this message"}
+                      >
+                        {message.isSpeaking ? (
+                          <VolumeX className="h-4 w-4" />
+                        ) : (
+                          <Volume2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
