@@ -38,8 +38,6 @@ Hiring business consultants can be **expensive** and often out of reach for smal
   - Offers **actionable recommendations** based on data-driven insights.  
   - Enhances strategic planning and risk assessment.  
 
-Here's the updated Markdown code with the backend and frontend README links inserted as text:
-
 
 ## Installation & Usage
 
