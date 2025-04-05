@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Bot, Send, Home, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { Bot, Send, Home, Mic, MicOff, Volume2, VolumeX, Copy, Check } from "lucide-react";
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -35,6 +35,7 @@ export default function Chat() {
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const {
     transcript,
@@ -210,6 +211,25 @@ export default function Chat() {
     });
   };
 
+  const handleCopy = async (content: string, index: number) => {
+    try {
+      // Strip markdown formatting before copying
+      const tempElement = document.createElement('div');
+      tempElement.innerHTML = content;
+      const textContent = tempElement.textContent || tempElement.innerText || content;
+      
+      await navigator.clipboard.writeText(textContent);
+      setCopiedIndex(index);
+      
+      // Reset the copied status after 2 seconds
+      setTimeout(() => {
+        setCopiedIndex(null);
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy text:', err);
+    }
+  };
+
   // Mark component as mounted to avoid SSR hydration issues
   useEffect(() => {
     setMounted(true);
@@ -306,7 +326,20 @@ export default function Chat() {
                     </ReactMarkdown>
                   </div>
                   {message.type === 'bot' && (
-                    <div className="flex justify-end mt-2">
+                    <div className="flex justify-end mt-2 gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleCopy(message.content, index)}
+                        className="p-1"
+                        title="Copy to clipboard"
+                      >
+                        {copiedIndex === index ? (
+                          <Check className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -354,50 +387,12 @@ export default function Chat() {
               }}
               className="flex-1 min-h-[60px] p-2 rounded-md border resize-none"
               rows={2}
+              disabled={isLoading}
             />
-            <div className="flex flex-col gap-2">
-              {browserSupportsSpeechRecognition && (
-                <Button
-                  onClick={toggleListening}
-                  variant="outline"
-                  className={`p-2 ${listening ? 'bg-primary text-primary-foreground' : ''}`}
-                  title={listening ? "Stop voice input" : "Start voice input"}
-                >
-                  {listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-                </Button>
-              )}
-              <Button 
-                onClick={handleSend} 
-                className="p-2"
-                disabled={isLoading}
-              >
-                <Send className="h-5 w-5" />
-              </Button>
-            </div>
+            <Button onClick={handleSend} disabled={isLoading} className="flex-shrink-0">
+              <Send className="h-4 w-4" />
+            </Button>
           </div>
-          {listening && (
-            <div className="mt-2 text-sm text-muted-foreground max-w-[1000px] mx-auto flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
-                <span>Listening... {transcript && `"${transcript}"`}</span>
-              </div>
-              {transcript && (
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  onClick={handleVoiceSend} 
-                  className="text-xs"
-                >
-                  Send voice message
-                </Button>
-              )}
-            </div>
-          )}
-          {!browserSupportsSpeechRecognition && (
-            <div className="mt-2 text-sm text-muted-foreground max-w-[1000px] mx-auto">
-              <span>Voice input is not supported in your browser. Try using Chrome for the best experience.</span>
-            </div>
-          )}
         </div>
       </div>
     </div>
