@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Bot, Send, Home, Mic, MicOff, Volume2, VolumeX, Copy, Check } from "lucide-react";
+import { Bot, Send, Home, Mic, MicOff, Volume2, VolumeX, Copy, Check, Download } from "lucide-react";
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -230,6 +230,23 @@ export default function Chat() {
     }
   };
 
+  const handleDownloadMessage = (content: string) => {
+    try {
+      // Create blob and download link
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'message.txt';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download message:', err);
+    }
+  };
+
   // Mark component as mounted to avoid SSR hydration issues
   useEffect(() => {
     setMounted(true);
@@ -252,12 +269,12 @@ export default function Chat() {
         </div>
         <div className="flex flex-col gap-4">
           <ThemeToggle />
-          <Link href="/">
-            <Button variant="outline" className="w-full">
-              <Home className="mr-2 h-4 w-4" />
-              Back to Home
-            </Button>
-          </Link>
+        <Link href="/">
+          <Button variant="outline" className="w-full">
+            <Home className="mr-2 h-4 w-4" />
+            Back to Home
+          </Button>
+        </Link>
         </div>
       </div>
 
@@ -266,98 +283,109 @@ export default function Chat() {
         {/* Chat Messages */}
         <div className="flex-1 overflow-y-auto p-4 w-full">
           <div className="max-w-[1000px] mx-auto">
-            {messages.map((message, index) => (
+          {messages.map((message, index) => (
+            <div
+              key={index}
+              className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
+            >
               <div
-                key={index}
-                className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
+                className={`max-w-[90%] md:max-w-[70%] p-4 rounded-lg overflow-hidden ${
+                  message.type === 'user'
+                    ? 'bg-primary text-primary-foreground'
+                    : message.type === 'bot' ? 'bg-accent/30 text-foreground border border-border' : 'bg-secondary text-secondary-foreground'
+                }`}
+                style={{ wordBreak: 'break-word' }}
               >
-                <div
-                  className={`max-w-[90%] md:max-w-[70%] p-4 rounded-lg overflow-hidden ${
-                    message.type === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : message.type === 'bot' ? 'bg-accent/30 text-foreground border border-border' : 'bg-secondary text-secondary-foreground'
-                  }`}
-                  style={{ wordBreak: 'break-word' }}
-                >
-                  <div className="prose prose-sm dark:prose-invert prose-headings:my-2 prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 max-w-none">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeRaw]}
-                      components={{
-                        h1: ({node, ...props}) => <h1 className="text-xl font-bold mt-4 mb-2" {...props} />,
-                        h2: ({node, ...props}) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
-                        h3: ({node, ...props}) => <h3 className="text-md font-bold mt-3 mb-1" {...props} />,
-                        ul: ({node, ...props}) => <ul className="list-disc pl-6 my-2" {...props} />,
-                        ol: ({node, ...props}) => <ol className="list-decimal pl-6 my-2" {...props} />,
-                        li: ({node, ...props}) => <li className="my-0.5" {...props} />,
-                        p: ({node, ...props}) => <p className="my-1.5" {...props} />,
-                        a: ({node, ...props}) => <a className="text-blue-500 hover:underline" {...props} />,
-                        table: ({node, ...props}) => (
-                          <div className="overflow-x-auto my-2 border border-border rounded">
-                            <table className="min-w-full border-collapse text-sm" {...props} />
+                <div className="prose prose-sm dark:prose-invert prose-headings:my-2 prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 max-w-none">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeRaw]}
+                    components={{
+                      h1: ({node, ...props}) => <h1 className="text-xl font-bold mt-4 mb-2" {...props} />,
+                      h2: ({node, ...props}) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
+                      h3: ({node, ...props}) => <h3 className="text-md font-bold mt-3 mb-1" {...props} />,
+                      ul: ({node, ...props}) => <ul className="list-disc pl-6 my-2" {...props} />,
+                      ol: ({node, ...props}) => <ol className="list-decimal pl-6 my-2" {...props} />,
+                      li: ({node, ...props}) => <li className="my-0.5" {...props} />,
+                      p: ({node, ...props}) => <p className="my-1.5" {...props} />,
+                      a: ({node, ...props}) => <a className="text-blue-500 hover:underline" {...props} />,
+                      table: ({node, ...props}) => (
+                        <div className="overflow-x-auto my-2 border border-border rounded">
+                          <table className="min-w-full border-collapse text-sm" {...props} />
+                        </div>
+                      ),
+                      thead: ({node, ...props}) => <thead className="bg-muted/50" {...props} />,
+                      th: ({node, ...props}) => <th className="border border-border p-2 text-left font-semibold" {...props} />,
+                      td: ({node, ...props}) => <td className="border border-border p-2 whitespace-normal break-words" {...props} />,
+                      blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-primary/30 pl-4 italic my-2" {...props} />,
+                      code: ({node, className, children, ...props}: {
+                        node?: any;
+                        className?: string;
+                        children?: React.ReactNode;
+                        [key: string]: any;
+                      }) => {
+                        const match = /language-(\w+)/.exec(className || '');
+                        const isInline = !match && !className;
+                        return !isInline ? (
+                          <div className="overflow-auto my-2 max-w-full rounded bg-muted/70 p-1">
+                            <pre className={`${match ? 'language-' + match[1] : ''} text-sm p-2`}>
+                              <code className={className} {...props}>{children}</code>
+                            </pre>
                           </div>
-                        ),
-                        thead: ({node, ...props}) => <thead className="bg-muted/50" {...props} />,
-                        th: ({node, ...props}) => <th className="border border-border p-2 text-left font-semibold" {...props} />,
-                        td: ({node, ...props}) => <td className="border border-border p-2 whitespace-normal break-words" {...props} />,
-                        blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-primary/30 pl-4 italic my-2" {...props} />,
-                        code: ({node, className, children, ...props}: {
-                          node?: any;
-                          className?: string;
-                          children?: React.ReactNode;
-                          [key: string]: any;
-                        }) => {
-                          const match = /language-(\w+)/.exec(className || '');
-                          const isInline = !match && !className;
-                          return !isInline ? (
-                            <div className="overflow-auto my-2 max-w-full rounded bg-muted/70 p-1">
-                              <pre className={`${match ? 'language-' + match[1] : ''} text-sm p-2`}>
-                                <code className={className} {...props}>{children}</code>
-                              </pre>
-                            </div>
-                          ) : (
-                            <code className="bg-muted/70 text-sm px-1.5 py-0.5 rounded font-mono" {...props}>{children}</code>
-                          );
-                        },
-                        hr: ({node, ...props}) => <hr className="my-4 border-t border-border" {...props} />,
-                      }}
-                    >
-                      {message.content}
-                    </ReactMarkdown>
-                  </div>
-                  {message.type === 'bot' && (
-                    <div className="flex justify-end mt-2 gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCopy(message.content, index)}
-                        className="p-1"
-                        title="Copy to clipboard"
-                      >
-                        {copiedIndex === index ? (
-                          <Check className="h-4 w-4 text-green-500" />
                         ) : (
-                          <Copy className="h-4 w-4" />
-                        )}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggleSpeech(index)}
-                        className="p-1"
-                        title={message.isSpeaking ? "Stop speaking" : "Speak this message"}
-                      >
-                        {message.isSpeaking ? (
-                          <VolumeX className="h-4 w-4" />
-                        ) : (
-                          <Volume2 className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  )}
+                          <code className="bg-muted/70 text-sm px-1.5 py-0.5 rounded font-mono" {...props}>{children}</code>
+                        );
+                      },
+                      hr: ({node, ...props}) => <hr className="my-4 border-t border-border" {...props} />,
+                    }}
+                  >
+                    {message.content}
+                  </ReactMarkdown>
                 </div>
+                
+                {/* Action buttons for bot messages */}
+                {message.type === 'bot' && (
+                  <div className="flex justify-end mt-3 gap-2 border-t pt-2 border-border/40">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCopy(message.content, index)}
+                      className="p-1 h-8 w-8 rounded-full"
+                      title="Copy to clipboard"
+                    >
+                      {copiedIndex === index ? (
+                        <Check className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDownloadMessage(message.content)}
+                      className="p-1 h-8 w-8 rounded-full"
+                      title="Download message"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleSpeech(index)}
+                      className="p-1 h-8 w-8 rounded-full"
+                      title={message.isSpeaking ? "Stop speaking" : "Speak this message"}
+                    >
+                      {message.isSpeaking ? (
+                        <VolumeX className="h-4 w-4" />
+                      ) : (
+                        <Volume2 className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                )}
               </div>
-            ))}
+            </div>
+          ))}
             {isLoading && (
               <div className="flex justify-start mb-4">
                 <div className="bg-secondary text-secondary-foreground max-w-[80%] p-4 rounded-lg">
@@ -389,10 +417,49 @@ export default function Chat() {
               rows={2}
               disabled={isLoading}
             />
-            <Button onClick={handleSend} disabled={isLoading} className="flex-shrink-0">
-              <Send className="h-4 w-4" />
-            </Button>
+            <div className="flex flex-col gap-2">
+              {browserSupportsSpeechRecognition && (
+                <Button
+                  onClick={toggleListening}
+                  variant="outline"
+                  className={`p-2 ${listening ? 'bg-primary text-primary-foreground' : ''}`}
+                  title={listening ? "Stop voice input" : "Start voice input"}
+                >
+                  {listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                </Button>
+              )}
+              <Button 
+                onClick={handleSend} 
+                className="p-2"
+                disabled={isLoading}
+              >
+                <Send className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
+          {listening && (
+            <div className="mt-2 text-sm text-muted-foreground max-w-[1000px] mx-auto flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+                <span>Listening... {transcript && `"${transcript}"`}</span>
+              </div>
+              {transcript && (
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  onClick={handleVoiceSend} 
+                  className="text-xs"
+                >
+                  Send voice message
+                </Button>
+              )}
+            </div>
+          )}
+          {!browserSupportsSpeechRecognition && (
+            <div className="mt-2 text-sm text-muted-foreground max-w-[1000px] mx-auto">
+              <span>Voice input is not supported in your browser. Try using Chrome for the best experience.</span>
+            </div>
+          )}
         </div>
       </div>
     </div>
