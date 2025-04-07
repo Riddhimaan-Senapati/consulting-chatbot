@@ -303,12 +303,45 @@ export default function Chat() {
                     components={{
                       h1: ({node, ...props}) => <h1 className="text-xl font-bold mt-4 mb-2" {...props} />,
                       h2: ({node, ...props}) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
-                      h3: ({node, ...props}) => <h3 className="text-md font-bold mt-3 mb-1" {...props} />,
+                      h3: ({node, children, ...props}: {
+                        node?: any;
+                        children?: React.ReactNode;
+                        [key: string]: any;
+                      }) => {
+                        const content = children?.toString() || '';
+                        // Always render the Sources section
+                        return <h3 className="text-md font-bold mt-3 mb-1" {...props}>{children}</h3>;
+                      },
                       ul: ({node, ...props}) => <ul className="list-disc pl-6 my-2" {...props} />,
                       ol: ({node, ...props}) => <ol className="list-decimal pl-6 my-2" {...props} />,
-                      li: ({node, ...props}) => <li className="my-0.5" {...props} />,
-                      p: ({node, ...props}) => <p className="my-1.5" {...props} />,
-                      a: ({node, ...props}) => <a className="text-blue-500 hover:underline" {...props} />,
+                      li: ({node, children, ...props}: {
+                        node?: any;
+                        children?: React.ReactNode;
+                        [key: string]: any;
+                      }) => {
+                        return <li className="my-0.5" {...props}>{children}</li>;
+                      },
+                      p: ({node, children, ...props}: {
+                        node?: any;
+                        children?: React.ReactNode;
+                        [key: string]: any;
+                      }) => {
+                        return <p className="my-1.5" {...props}>{children}</p>;
+                      },
+                      a: ({node, href, children, ...props}) => {
+                        if (!href) return <>{children}</>;
+                        return (
+                          <a 
+                            href={href} 
+                            className="text-blue-500 hover:underline"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            {...props}
+                          >
+                            {children}
+                          </a>
+                        );
+                      },
                       table: ({node, ...props}) => (
                         <div className="overflow-x-auto my-2 border border-border rounded">
                           <table className="min-w-full border-collapse text-sm" {...props} />
