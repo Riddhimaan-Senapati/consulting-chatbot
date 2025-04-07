@@ -31,7 +31,7 @@ def initialize_workflow():
         
         return text.strip()
     
-    # Function to format source links in markdown
+    # Function to format source links in markdown with numbered citations
     def format_source_links(results):
         if not results:
             return ""
@@ -39,27 +39,46 @@ def initialize_workflow():
         sources = []
         seen_urls = set()
         
-        for result in results:
-            # Extract URL and title from each result
-            if isinstance(result, dict) and 'url' in result and 'title' in result:
-                url = result['url']
-                title = result['title']
-            elif hasattr(result, 'metadata') and hasattr(result, 'page_content'):
-                # Handle Document objects from Tavily
-                metadata = result.metadata
-                url = metadata.get('source', metadata.get('url', ''))
-                title = metadata.get('title', url)
-            else:
-                continue
+        for i, result in enumerate(results, 1):
+            try:
+                # Extract URL and title from each result
+                url = None
+                title = None
+                metadata = {}
                 
-            # Avoid duplicate URLs
-            if url and url not in seen_urls:
-                seen_urls.add(url)
-                sources.append(f"- [{title}]({url})")
+                if isinstance(result, dict):
+                    if 'url' in result and 'title' in result:
+                        url = result['url']
+                        title = result['title']
+                        metadata = result.get('metadata', {})
+                    elif isinstance(result.get('metadata'), dict):
+                        metadata = result['metadata']
+                        url = metadata.get('source', metadata.get('url', ''))
+                        title = metadata.get('title', url)
+                elif hasattr(result, 'metadata') and hasattr(result, 'page_content'):
+                    metadata = result.metadata
+                    url = metadata.get('source', metadata.get('url', ''))
+                    title = metadata.get('title', url)
+                else:
+                    continue
+                
+                # Clean the title and url
+                title = str(title).strip().replace('\n', ' ').replace('"', "'") if title else ""
+                url = str(url).strip() if url else ""
+                
+                # Avoid duplicate URLs and empty/invalid entries
+                if url and url not in seen_urls and title:
+                    seen_urls.add(url)
+                    # Format source with proper citation style
+                    sources.append(f"{i}. [{title}]({url})")
+            except Exception as e:
+                print(f"Error processing source {i}: {e}")
+                continue
         
         if not sources:
             return ""
             
+        # Create a proper sources section with a header
         return "\n\n### Sources\n" + "\n".join(sources)
 
     # Define analysis functions
@@ -75,6 +94,10 @@ def initialize_workflow():
                 
                 Do NOT wrap your entire response in ```markdown or ```md code blocks. 
                 Write the content directly using markdown syntax.
+                
+                IMPORTANT: Include in-text citations using the format [X] where X is the source number (1, 2, 3, etc.).
+                For example: "According to recent market research [1], the industry has shown significant growth."
+                Make sure to cite sources for factual information, statistics, and specific claims.
                 
                 Structure your analysis with the following sections:
                 
@@ -127,6 +150,10 @@ def initialize_workflow():
                 
                 Do NOT wrap your entire response in ```markdown or ```md code blocks. 
                 Write the content directly using markdown syntax.
+                
+                IMPORTANT: Include in-text citations using the format [X] where X is the source number (1, 2, 3, etc.).
+                For example: "According to recent market research [1], the industry has shown significant growth."
+                Make sure to cite sources for factual information, statistics, and specific claims.
                 
                 Structure your analysis with the following sections:
                 
@@ -197,6 +224,10 @@ def initialize_workflow():
                 Do NOT wrap your entire response in ```markdown or ```md code blocks. 
                 Write the content directly using markdown syntax.
                 
+                IMPORTANT: Include in-text citations using the format [X] where X is the source number (1, 2, 3, etc.).
+                For example: "According to recent market research [1], the industry has shown significant growth."
+                Make sure to cite sources for factual information, statistics, and specific claims.
+                
                 Follow these markdown formatting guidelines:
                 1. Use # for main headings and ## or ### for subheadings
                 2. Use bullet points (- or *) for lists of items
@@ -233,6 +264,10 @@ def initialize_workflow():
             
             Do NOT wrap your response in ```markdown or ```md code blocks.
             Write the content directly using markdown syntax.
+            
+            IMPORTANT: Include in-text citations using the format [X] where X is the source number (1, 2, 3, etc.).
+            For example: "According to recent market research [1], the industry has shown significant growth."
+            Make sure to cite sources for factual information, statistics, and specific claims.
             
             Use these markdown elements appropriately:
             - Headings with # or ##
