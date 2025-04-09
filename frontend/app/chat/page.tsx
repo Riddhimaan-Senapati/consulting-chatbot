@@ -8,6 +8,10 @@ import ReactMarkdown from 'react-markdown';
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+// const fileDownload = require("js-file-download");
+import fileDownload from "js-file-download";
+import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
+
 
 
 interface Message {
@@ -73,6 +77,8 @@ export default function Chat() {
       resetTranscript();
     }
   };
+
+
 
   const handleDownload = async () => {
       // send get request "/download" to get collection from database
@@ -296,6 +302,12 @@ export default function Chat() {
             <Button variant="outline" className="w-full">
               <Home className="mr-2 h-4 w-4" />
                 Back to Home
+            </Button>
+          </Link>
+          <Link href="">   {/* How to get item id ? */}
+            <Button variant="outline" className="w-full" onClick={handleDownload}>
+              <Home className="mr-2 h-4 w-4"/>
+                Download Chat
             </Button>
           </Link>
           <Link href="">   {/* How to get item id ? */}

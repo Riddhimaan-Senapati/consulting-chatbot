@@ -25,6 +25,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Connecting to MongoDB Database
+client = motor.motor_asyncio.AsyncIOMotorClient(os.getenv("MONGODB_URL"))
+db = client.Consulting_data
+discussion_collection = db.get_collection("Discussion_data")
+
+# Represents an ObjectId field in the database.
+# It will be represented as a `str` on the model so that it can be serialized to JSON.
+PyObjectId = Annotated[str, BeforeValidator(str)]
 
 analysis_chain = initialize_workflow()
 
@@ -82,6 +90,14 @@ async def analyze(request: AnalysisRequest = Body(...)):
     }
     result = analysis_chain.invoke(state)
 
+    print("Debug - Result:", result)  # Debugging line => I am not getting the "response" from here
+
+
+    final_data = {
+        "messages": request.messages,
+        "input": request.user_input,
+        "response": result["messages"][-1][1],
+        "full_history": request.messages + [(request.user_input, result["messages"][-1][1])]
     }
     print("Final Result:", final_data)  # Debugging line
     # Send result data to the Db  
