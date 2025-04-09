@@ -8,6 +8,9 @@ import ReactMarkdown from 'react-markdown';
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+// const fileDownload = require("js-file-download");
+import fileDownload from "js-file-download";
+
 
 interface Message {
   type: 'user' | 'bot';
@@ -20,6 +23,8 @@ interface AnalysisResponse {
   full_history: [string, string][];
 }
 
+
+
 export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -29,6 +34,26 @@ export default function Chat() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleDownload = async () => {
+      // send get request "/download" to get collection from database
+
+      try{
+        const response = await fetch('http://127.0.0.1:8000/download', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/pdf'
+        }
+        });
+        // response contains pdf file
+        const blob = await response.blob();
+        fileDownload(blob, "Consultation.pdf");
+        
+      }catch(error){
+        console.log(error);
+      }
+
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -97,7 +122,13 @@ export default function Chat() {
           <Link href="/">
             <Button variant="outline" className="w-full">
               <Home className="mr-2 h-4 w-4" />
-              Back to Home
+                Back to Home
+            </Button>
+          </Link>
+          <Link href="">   {/* How to get item id ? */}
+            <Button variant="outline" className="w-full" onClick={handleDownload}>
+              <Home className="mr-2 h-4 w-4"/>
+                Download Chat
             </Button>
           </Link>
         </div>
