@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **Consulting Chatbot** is an AI-powered tool designed to assist small businesses with strategic analysis and decision-making. It performs **SWOT** (Strengths, Weaknesses, Opportunities, and Threats), **PESTLE** (Political, Economic, Social, Technological, Legal, and Environmental), and **TOWS** (an advanced SWOT analysis) analyses. Additionally, it provides **real-time business insights** by leveraging web-sourced information.
+The **Consulting Chatbot** is an AI-powered tool designed to assist small businesses with strategic analysis and decision-making. It performs **SWOT** (Strengths, Weaknesses, Opportunities, and Threats), **PESTLE** (Political, Economic, Social, Technological, Legal, and Environmental), **TOWS** (an advanced SWOT analysis), **Porter's Five Forces**, and **Business Model Canvas** analyses. Additionally, it provides **real-time business insights** by leveraging web-sourced information.
 
 ## Objective
 
@@ -26,16 +26,17 @@ Hiring business consultants can be **expensive** and often out of reach for smal
   - **SWOT Analysis** – Identifies strengths, weaknesses, opportunities, and threats.  
   - **PESTLE Analysis** – Evaluates external macroeconomic factors.  
   - **TOWS Analysis** – Develops strategic recommendations based on SWOT insights.  
+  - **Porter's Five Forces Analysis** – Assesses industry competition and attractiveness through five key forces: competitive rivalry, threat of new entrants, bargaining power of suppliers, bargaining power of buyers, and threat of substitutes.
+  - **Business Model Canvas Analysis** – Provides a comprehensive view of a business model through nine building blocks: customer segments, value propositions, channels, customer relationships, revenue streams, key resources, key activities, key partnerships, and cost structure.
 
 - **Real-Time Business Insights**  
   - Leverages **web-sourced** data to provide up-to-date information.  
   - Helps businesses adapt to market changes in real time.  
+  - Includes **source links** for all analyses, allowing users to verify information and explore topics further.
 
 - **AI-Powered Decision Support**  
   - Offers **actionable recommendations** based on data-driven insights.  
   - Enhances strategic planning and risk assessment.  
-
-Here's the updated Markdown code with the backend and frontend README links inserted as text:
 
 
 ## Installation & Usage

@@ -67,3 +67,14 @@ When you're done working, you can deactivate the virtual environment by running:
 deactivate
 ```
 
+##   Testing
+
+There are also tests to make sure the backend is working in the  `test_main.py` file.  In order to use the tests, go to the backend folder and use the following command
+
+```
+pytest
+```
+You should be able to see the test results.
+
+
+
