@@ -34,7 +34,7 @@ Activate the virtual environment:
 .venv\Scripts\Activate.ps1
 
 #For macOS/Linux
-source venv/bin/activate
+source .venv/bin/activate
 ```
 
 # 4. Install Dependencies
