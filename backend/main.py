@@ -19,7 +19,7 @@ app = FastAPI()
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Update with your frontend URL
+    allow_origins=["http://localhost:3003"],  # Update with your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -74,7 +74,8 @@ async def download_analysis(format: str = Query("pdf")):
         pdf = FPDF()
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
-        pdf.set_font("Arial", size=12)
+        pdf.add_font("NotoSans", "", "fonts/NotoSans-Regular.ttf", uni=True)
+        pdf.set_font("NotoSans", size=12)
         pdf.multi_cell(0, 10, analysis_text)
         pdf.output(file_path)
     

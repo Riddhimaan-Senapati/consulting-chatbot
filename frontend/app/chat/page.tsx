@@ -84,7 +84,7 @@ export default function Chat() {
       // send get request "/download" to get collection from database
 
       try{
-        const response = await fetch('http://127.0.0.1:8000/download', {
+        const response = await fetch('http://127.0.0.1:8001/download', {
           method: 'GET',
           headers: {
             'Accept': 'application/pdf'
@@ -120,7 +120,7 @@ export default function Chat() {
       apiMessages.push(['human', userMessage.content]);
 
       // Call the backend API
-      const response = await fetch('http://127.0.0.1:8000/analyze', {
+      const response = await fetch('http://127.0.0.1:8001/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -310,12 +310,7 @@ export default function Chat() {
                 Download Chat
             </Button>
           </Link>
-          <Link href="">   {/* How to get item id ? */}
-            <Button variant="outline" className="w-full" onClick={handleDownload}>
-              <Home className="mr-2 h-4 w-4"/>
-                Download Chat
-            </Button>
-          </Link>
+          
 
         </div>
       </div>
