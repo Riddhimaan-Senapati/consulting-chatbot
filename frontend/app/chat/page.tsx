@@ -1,18 +1,18 @@
 'use client';
 
-// Keep necessary imports
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Bot, Send, Home, Mic, MicOff, Volume2, VolumeX, Copy, Check, Download, RefreshCw } from "lucide-react";
+import { Bot, Send, Home, Mic, MicOff, Volume2, VolumeX, Copy, Check, Download,RefreshCw } from "lucide-react";
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+// const fileDownload = require("js-file-download");
 import fileDownload from "js-file-download";
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from "@/components/ui/textarea";
+
+
 
 interface Message {
   type: 'user' | 'bot';
@@ -20,29 +20,28 @@ interface Message {
   isSpeaking?: boolean;
 }
 
+// API response interface to match backend structure
 interface AnalysisResponse {
-  id?: string;
   response: string;
   full_history: [string, string][];
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001';
+
 
 export default function Chat() {
   const [mounted, setMounted] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { type: 'bot', content: 'Hello! I can help you with SWOT, TOWS, and PESTLE analysis. What would you like to analyze today?', isSpeaking: false }
+    {
+      type: 'bot',
+      content: 'Hello! I can help you with SWOT, TOWS, and PESTLE analysis. What would you like to analyze today?',
+      isSpeaking: false
+    }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const messagesEndRef = useRef<null | HTMLDivElement>(null);
-
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [isSpeechReady, setIsSpeechReady] = useState(false);
 
   const {
     transcript,
@@ -52,78 +51,160 @@ export default function Chat() {
     isMicrophoneAvailable
   } = useSpeechRecognition();
 
-  // --- Effects ---
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
-  useEffect(() => { if (listening && transcript) { setInput(transcript); } }, [transcript, listening]);
-
+  // Update input field with transcript when voice input changes
   useEffect(() => {
-      const loadVoices = () => {
-        if (!window.speechSynthesis) { setIsSpeechReady(false); return; }
-        const availableVoices = window.speechSynthesis.getVoices();
-        if (availableVoices.length > 0) {
-          setVoices(availableVoices); setIsSpeechReady(true);
-           window.speechSynthesis.removeEventListener('voiceschanged', loadVoices); // Safe to remove now
-        }
-      };
-      if(window.speechSynthesis){ // Ensure API exists before adding listener
-          window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
-          loadVoices(); // Attempt initial load
-      } else {
-          console.warn("Speech synthesis not supported.");
-      }
-      return () => { // Cleanup
-        if(window.speechSynthesis) {
-             window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
-        }
-      };
-    }, []);
+    if (transcript) {
+      setInput(transcript);
+    }
+  }, [transcript]);
 
-  useEffect(() => { setMounted(true); }, []);
-
-  // --- Microphone Handling ---
-  const toggleListening = () => { /* ... (no changes needed from previous version) ... */
-    if (!browserSupportsSpeechRecognition) { setError("Voice recognition not supported."); return; }
-    if (!isMicrophoneAvailable) { setError("Microphone not available/permitted."); return; }
+  // Toggle voice recognition
+  const toggleListening = () => {
     if (listening) {
-      SpeechRecognition.stopListening(); setIsListening(false);
+      SpeechRecognition.stopListening();
+      setIsListening(false);
     } else {
-      resetTranscript(); setInput('');
-      SpeechRecognition.startListening({ continuous: true, language: 'en-US' }); setIsListening(true);
-    }
-   };
-
-  const handleVoiceSend = () => { /* ... (no changes needed from previous version) ... */
-    const trimmedTranscript = transcript.trim();
-    if (trimmedTranscript && !isLoading) {
-      const finalTranscript = trimmedTranscript;
-      handleSend(finalTranscript);
-      SpeechRecognition.stopListening(); setIsListening(false);
+      SpeechRecognition.startListening({ continuous: true, language: 'en-US' });
+      setIsListening(true);
       resetTranscript();
-    } else if (!trimmedTranscript) {
-      SpeechRecognition.stopListening(); setIsListening(false);
     }
   };
 
-  // --- API and Message Handling ---
-  const handleDownload = async () => { /* ... (keep previous working version) ... */
-    setError(null); try { const response = await fetch(`${API_BASE_URL}/download?format=pdf`, { method: 'GET', headers: { 'Accept': 'application/pdf' } }); if (!response.ok) { const e = await response.text(); throw new Error(`DL ${response.status}: ${e||''}`); } let f = "Consultation.pdf"; const d = response.headers.get('content-disposition'); if (d?.includes('attachment')) { const m = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(d); if (m?.[1]) { f = m[1].replace(/['"]/g,''); } } const b = await response.blob(); fileDownload(b, f); } catch (err:any) { console.error('DL err:', err); setError(`DL failed: ${err.message}`); }
+  // Handle voice send
+  const handleVoiceSend = () => {
+    if (transcript.trim()) {
+      handleSend();
+      resetTranscript();
+    }
   };
 
-  const handleSend = async (directInput?: string) => { /* ... (keep previous working version) ... */
-    const messageToSend = (directInput ?? input).trim(); if (!messageToSend || isLoading) return; setError(null); const userMessage: Message = { type: 'user', content: messageToSend }; setMessages(prev => [...prev, userMessage]); if (!directInput) { setInput(''); } setIsLoading(true); const historyForApi = messages.map(msg => [msg.type === 'user' ? 'human' : 'ai', msg.content] as [string, string]); historyForApi.push(['human', messageToSend]); try { const response = await fetch(`${API_BASE_URL}/analyze`, { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify({ messages: historyForApi, user_input: messageToSend }), }); if (!response.ok) { let eMsg = `API ${response.status}`; try { const eD = await response.json(); eMsg += ` - ${eD.detail||JSON.stringify(eD)}`; } catch { const tE = await response.text(); eMsg += ` - ${tE}`; } throw new Error(eMsg); } const data: AnalysisResponse = await response.json(); setMessages(prev => [...prev, { type: 'bot', content: data.response, isSpeaking: false }]); } catch (err:any) { console.error('API Error:', err); const eC = `Error: ${err.message||'Request failed'}`; setError(eC); setMessages(prev => [...prev, { type: 'bot', content: eC, isSpeaking: false }]); } finally { setIsLoading(false); }
+  const handleDownload = async () => {
+    // send get request "/download" to get collection from database
+
+    try{
+      const response = await fetch('http://127.0.0.1:8001/download', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/pdf'
+      }
+      });
+      // response contains pdf file
+      const blob = await response.blob();
+      fileDownload(blob, "Consultation.pdf");
+      
+    }catch(error){
+      console.log(error);
+    }
+
   };
 
-  const handleRerun = async (botMessageIndex: number) => { /* ... (keep previous working version) ... */
-    if (isLoading || botMessageIndex <= 0) return; setError(null); setIsLoading(true); const userMessageIndex = botMessageIndex - 1; if (userMessageIndex < 0 || messages[userMessageIndex]?.type !== 'user') { setError("Cannot rerun."); setIsLoading(false); return; } const userMessageToRerun = messages[userMessageIndex]; const historyForApi = messages.slice(0, userMessageIndex).map(msg => [ msg.type === 'user' ? 'human' : 'ai', msg.content] as [string, string]); historyForApi.push(['human', userMessageToRerun.content]); try { const response = await fetch(`${API_BASE_URL}/analyze`, { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify({ messages: historyForApi, user_input: userMessageToRerun.content }), }); if (!response.ok) { let eMsg = `Rerun ${response.status}`; try {const eD=await response.json();eMsg+=` - ${eD.detail||JSON.stringify(eD)}`;} catch{const tE=await response.text();eMsg+=` - ${tE}`;}; throw new Error(eMsg); } const data: AnalysisResponse = await response.json(); setMessages(prev => { const uM = [...prev]; if (botMessageIndex < uM.length && uM[botMessageIndex].type === 'bot') { uM[botMessageIndex] = { type: 'bot', content: data.response, isSpeaking: false }; } else { console.error("Rerun index mismatch"); } return uM; }); } catch (err: any) { console.error('Rerun Error:', err); setError(`Rerun failed: ${err.message}`); } finally { setIsLoading(false); }
+  const handleRerun = async (botMessageIndex: number) => {
+    if (isLoading || botMessageIndex <= 0) return;
+    setIsLoading(true);
+    const userMessageIndex = botMessageIndex - 1;
+    if (userMessageIndex < 0 || messages[userMessageIndex]?.type !== 'user') {
+      setIsLoading(false);
+      return;
+    }
+    const userMessageToRerun = messages[userMessageIndex];
+    const historyForApi = messages.slice(0, userMessageIndex).map(msg => [
+      msg.type === 'user' ? 'human' : 'ai',
+      msg.content
+    ] as [string, string]);
+    historyForApi.push(['human', userMessageToRerun.content]);
+    try {
+      const response = await fetch('http://127.0.0.1:8001/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: historyForApi,
+          user_input: userMessageToRerun.content
+        }),
+      });
+      if (!response.ok) {
+        throw new Error('API request failed');
+      }
+      const data: AnalysisResponse = await response.json();
+      setMessages(prev => {
+        const uM = [...prev];
+        if (botMessageIndex < uM.length && uM[botMessageIndex].type === 'bot') {
+          uM[botMessageIndex] = { type: 'bot', content: data.response, isSpeaking: false };
+        } else {
+          console.error("Rerun index mismatch");
+        }
+        return uM;
+      });
+    } catch (err: any) {
+      console.error('Rerun Error:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
 
-  // --- Speech Synthesis Handling ---
+    // Add user message to chat
+    const userMessage = { type: 'user' as const, content: input };
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsLoading(true);
+
+    try {
+      // Convert messages to the format expected by the backend
+      const apiMessages = messages.map(msg => [
+        msg.type === 'user' ? 'human' : 'ai', 
+        msg.content
+      ]);
+      
+      // Add the new user message
+      apiMessages.push(['human', userMessage.content]);
+
+      // Call the backend API
+      const response = await fetch('http://127.0.0.1:8001/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: apiMessages,
+          user_input: userMessage.content
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('API request failed');
+      }
+
+      const data: AnalysisResponse = await response.json();
+      
+      // Add bot response to chat
+      setMessages(prev => [...prev, {
+        type: 'bot',
+        content: data.response,
+        isSpeaking: false
+      }]);
+    } catch (error) {
+      console.error('Error calling API:', error);
+      // Add error message to chat
+      setMessages(prev => [...prev, {
+        type: 'bot',
+        content: "Sorry, I encountered an error while processing your request. Please try again.",
+        isSpeaking: false
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const toggleSpeech = (index: number) => {
     // If this message is already speaking, stop it
     if (speakingIndex === index) {
       window.speechSynthesis.cancel();
       setSpeakingIndex(null);
+      
       setMessages(prevMessages => {
         const newMessages = [...prevMessages];
         // Make sure to mark all messages as not speaking
@@ -134,19 +215,25 @@ export default function Chat() {
       });
       return;
     }
+    
     // Otherwise, stop any current speech and start this one
     window.speechSynthesis.cancel();
+    
     setMessages(prevMessages => {
       const newMessages = [...prevMessages];
+      
       // Mark all messages as not speaking
       newMessages.forEach(msg => {
         msg.isSpeaking = false;
       });
+      
       // Mark this message as speaking
       const message = newMessages[index];
       message.isSpeaking = true;
+      
       // Create and configure the utterance
       const utterance = new SpeechSynthesisUtterance(message.content);
+      
       // Try to get a good voice
       const voices = window.speechSynthesis.getVoices();
       if (voices && voices.length > 0) {
@@ -158,9 +245,11 @@ export default function Chat() {
         );
         utterance.voice = preferredVoice || voices[0];
       }
+      
       // Set rate and pitch to normal values
       utterance.rate = 1;
       utterance.pitch = 1;
+      
       // When speech ends, update the speaking state
       utterance.onend = () => {
         setSpeakingIndex(null);
@@ -172,6 +261,7 @@ export default function Chat() {
           return updatedMessages;
         });
       };
+      
       // Handle errors
       utterance.onerror = () => {
         setSpeakingIndex(null);
@@ -183,89 +273,312 @@ export default function Chat() {
           return updatedMessages;
         });
       };
+      
       // Start speaking and update the speaking index
       window.speechSynthesis.speak(utterance);
       setSpeakingIndex(index);
+      
       return newMessages;
     });
   };
 
-  // --- Other Utils ---
-  const handleCopy = async (content: string, index: number) => { /* ... (no changes) ... */
-    setError(null); if (!navigator.clipboard) { setError("Clipboard unavailable."); return; } try { let t = content; try { t = content.replace(/```[\s\S]*?```/g, '').replace(/`([^`]*)`/g, '$1').replace(/(\*\*|__)(.*?)\1/g, '$2').replace(/(\*|_)(.*?)\1/g, '$2').replace(/!\[.*?\]\(.*?\)/g, '').replace(/\[(.*?)\]\(.*?\)/g, '$1').replace(/^[#>*\-+\s]*/gm, '').trim(); } catch {} await navigator.clipboard.writeText(t); setCopiedIndex(index); setTimeout(() => setCopiedIndex(null), 2000); } catch (err) { console.error('Copy err:', err); setError('Failed to copy.'); }
-  };
-  const handleDownloadMessage = (content: string) => { /* ... (no changes) ... */
-    setError(null); try { let t = content; try { t = content.replace(/```[\s\S]*?```/g, '').replace(/`([^`]*)`/g, '$1').replace(/(\*\*|__)(.*?)\1/g, '$2').replace(/(\*|_)(.*?)\1/g, '$2').replace(/!\[.*?\]\(.*?\)/g, '').replace(/\[(.*?)\]\(.*?\)/g, '$1').replace(/^[#>*\-+\s]*/gm, '').trim(); } catch {} const b = new Blob([t], { type: 'text/plain;charset=utf-8' }); fileDownload(b, 'message.txt'); } catch (err) { console.error('Msg DL err:', err); setError('Failed to download message.'); }
+  const handleCopy = async (content: string, index: number) => {
+    try {
+      // Strip markdown formatting before copying
+      const tempElement = document.createElement('div');
+      tempElement.innerHTML = content;
+      const textContent = tempElement.textContent || tempElement.innerText || content;
+      
+      await navigator.clipboard.writeText(textContent);
+      setCopiedIndex(index);
+      
+      // Reset the copied status after 2 seconds
+      setTimeout(() => {
+        setCopiedIndex(null);
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy text:', err);
+    }
   };
 
-  // --- Render ---
-  if (!mounted) { return <div className="flex h-screen items-center justify-center bg-background"><div className="animate-pulse">Loading...</div></div>; }
+  const handleDownloadMessage = (content: string) => {
+    try {
+      // Create blob and download link
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'message.txt';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to download message:', err);
+    }
+  };
+
+  // Mark component as mounted to avoid SSR hydration issues
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Only render the full component after client-side hydration
+  if (!mounted) {
+    return <div className="flex h-screen items-center justify-center bg-background">
+      <div className="animate-pulse">Loading...</div>
+    </div>;
+  }
 
   return (
-    <div className="flex h-screen bg-background text-foreground">
+    <div className="flex h-screen bg-background">
       {/* Sidebar */}
-      <div className="w-64 bg-card border-r border-border p-4 flex-shrink-0 flex flex-col">
-        <div className="flex items-center gap-2 mb-8"> <Bot className="h-8 w-8 text-primary" /> <span className="text-2xl font-bold">AnalyticAI</span> </div>
+      <div className="w-64 bg-card border-r p-4 flex-shrink-0">
+        <div className="flex items-center gap-2 mb-8">
+          <Bot className="h-8 w-8 text-primary" />
+          <span className="text-2xl font-bold">AnalyticAI</span>
+        </div>
         <div className="flex flex-col gap-4">
           <ThemeToggle />
-          <Link href="/" passHref> <Button variant="outline" className="w-full justify-start"> <Home className="mr-2 h-4 w-4" /> Back to Home </Button> </Link>
-          <Button variant="outline" className="w-full justify-start" onClick={handleDownload}> <Download className="mr-2 h-4 w-4"/> Download Chat </Button>
-        </div>
-        <div className="mt-auto text-xs text-muted-foreground">
-            {window.speechSynthesis ? (isSpeechReady? 'TTS Ready.' : 'TTS Init...') : 'TTS N/A.'}
-            {browserSupportsSpeechRecognition?' Voice enabled.':' Voice N/A.'}
-            {!isMicrophoneAvailable && browserSupportsSpeechRecognition&&' Mic needed.'}
+
+          <Link href="/">
+            <Button variant="outline" className="w-full flex items-center justify-start h-12 px-4 gap-2">
+  <Home className="h-5 w-5" />
+  Back to Home
+</Button>
+          </Link>
+          <Button variant="outline" className="w-full flex items-center justify-start h-12 px-4 gap-2" onClick={handleDownload}>
+  <Download className="h-5 w-5" />
+  Download Chat
+</Button>
+          
+
         </div>
       </div>
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
-         {error && (<div className="p-2 bg-destructive text-destructive-foreground text-sm text-center z-10">{error} <Button variant="ghost" size="sm" onClick={() => setError(null)} className="ml-2 p-1 h-auto">X</Button></div>)}
-
-        <ScrollArea className="flex-1 p-4 w-full">
-          <div className="max-w-4xl mx-auto space-y-4">
+        {/* Chat Messages */}
+        <div className="flex-1 overflow-y-auto p-4 w-full">
+          <div className="max-w-[1000px] mx-auto">
           {messages.map((message, index) => (
-            <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] md:max-w-[75%] p-3 px-4 rounded-lg shadow-sm overflow-hidden ${ message.type === 'user' ? 'bg-primary text-primary-foreground' : 'bg-accent/30 text-foreground border border-border' }`} style={{ wordBreak: 'break-word' }}>
-                <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1.5 prose-table:my-2">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]} components={{ a: ({node, href, children, ...props}) => ( <a href={href} className="text-blue-500 hover:underline break-all" target="_blank" rel="noopener noreferrer" {...props}>{children}</a>), table: ({node, ...props}) => ( <div className="overflow-x-auto my-2 border border-border rounded"><table className="min-w-full border-collapse text-xs" {...props} /></div>), th: ({node, ...props}) => <th className="border border-border p-1.5 text-left font-semibold bg-muted/30" {...props} />, td: ({node, ...props}) => <td className="border border-border p-1.5" {...props} />, }}>
+            <div
+              key={index}
+              className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
+            >
+              <div
+                className={`max-w-[90%] md:max-w-[70%] p-4 rounded-lg overflow-hidden ${
+                  message.type === 'user'
+                    ? 'bg-primary text-primary-foreground'
+                    : message.type === 'bot' ? 'bg-accent/30 text-foreground border border-border' : 'bg-secondary text-secondary-foreground'
+                }`}
+                style={{ wordBreak: 'break-word' }}
+              >
+                <div className="prose prose-sm dark:prose-invert prose-headings:my-2 prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 max-w-none">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeRaw]}
+                    components={{
+                      h1: ({node, ...props}) => <h1 className="text-xl font-bold mt-4 mb-2" {...props} />,
+                      h2: ({node, ...props}) => <h2 className="text-lg font-bold mt-4 mb-2" {...props} />,
+                      h3: ({node, children, ...props}: {
+                        node?: any;
+                        children?: React.ReactNode;
+                        [key: string]: any;
+                      }) => {
+                        const content = children?.toString() || '';
+                        // Always render the Sources section
+                        return <h3 className="text-md font-bold mt-3 mb-1" {...props}>{children}</h3>;
+                      },
+                      ul: ({node, ...props}) => <ul className="list-disc pl-6 my-2" {...props} />,
+                      ol: ({node, ...props}) => <ol className="list-decimal pl-6 my-2" {...props} />,
+                      li: ({node, children, ...props}: {
+                        node?: any;
+                        children?: React.ReactNode;
+                        [key: string]: any;
+                      }) => {
+                        return <li className="my-0.5" {...props}>{children}</li>;
+                      },
+                      p: ({node, children, ...props}: {
+                        node?: any;
+                        children?: React.ReactNode;
+                        [key: string]: any;
+                      }) => {
+                        return <p className="my-1.5" {...props}>{children}</p>;
+                      },
+                      a: ({node, href, children, ...props}) => {
+                        if (!href) return <>{children}</>;
+                        return (
+                          <a 
+                            href={href} 
+                            className="text-blue-500 hover:underline"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            {...props}
+                          >
+                            {children}
+                          </a>
+                        );
+                      },
+                      table: ({node, ...props}) => (
+                        <div className="overflow-x-auto my-2 border border-border rounded">
+                          <table className="min-w-full border-collapse text-sm" {...props} />
+                        </div>
+                      ),
+                      thead: ({node, ...props}) => <thead className="bg-muted/50" {...props} />,
+                      th: ({node, ...props}) => <th className="border border-border p-2 text-left font-semibold" {...props} />,
+                      td: ({node, ...props}) => <td className="border border-border p-2 whitespace-normal break-words" {...props} />,
+                      blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-primary/30 pl-4 italic my-2" {...props} />,
+                      code: ({node, className, children, ...props}: {
+                        node?: any;
+                        className?: string;
+                        children?: React.ReactNode;
+                        [key: string]: any;
+                      }) => {
+                        const match = /language-(\w+)/.exec(className || '');
+                        const isInline = !match && !className;
+                        return !isInline ? (
+                          <div className="overflow-auto my-2 max-w-full rounded bg-muted/70 p-1">
+                            <pre className={`${match ? 'language-' + match[1] : ''} text-sm p-2`}>
+                              <code className={className} {...props}>{children}</code>
+                            </pre>
+                          </div>
+                        ) : (
+                          <code className="bg-muted/70 text-sm px-1.5 py-0.5 rounded font-mono" {...props}>{children}</code>
+                        );
+                      },
+                      hr: ({node, ...props}) => <hr className="my-4 border-t border-border" {...props} />,
+                    }}
+                  >
                     {message.content}
                   </ReactMarkdown>
                 </div>
+                
+                {/* Action buttons for bot messages */}
                 {message.type === 'bot' && (
-                  <div className="flex justify-end items-center mt-2 pt-1.5 border-t border-border/40 gap-1">
-                    {index > 0 && ( <Button variant="ghost" size="icon" onClick={() => handleRerun(index)} className="h-7 w-7 text-muted-foreground hover:text-foreground" title="Regenerate" disabled={isLoading}> <RefreshCw className="h-4 w-4" /> </Button> )}
-                    <Button variant="ghost" size="icon" onClick={() => handleCopy(message.content, index)} className="h-7 w-7 text-muted-foreground hover:text-foreground" title="Copy"> {copiedIndex === index ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />} </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDownloadMessage(message.content)} className="h-7 w-7 text-muted-foreground hover:text-foreground" title="Download text"> <Download className="h-4 w-4" /> </Button>
-                    <Button variant="ghost" size="icon" onClick={() => toggleSpeech(index, message.content)} className={`h-7 w-7 ${speakingIndex === index ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`} title={speakingIndex === index ? "Stop" : (isSpeechReady ? "Speak" : "TTS Loading...")} disabled={!isSpeechReady || !window.speechSynthesis} > {speakingIndex === index ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />} </Button>
+                  <div className="flex justify-end mt-3 gap-2 border-t pt-2 border-border/40">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCopy(message.content, index)}
+                      className="p-1 h-8 w-8 rounded-full"
+                      title="Copy to clipboard"
+                    >
+                      {copiedIndex === index ? (
+                        <Check className="h-4 w-4 text-green-500" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDownloadMessage(message.content)}
+                      className="p-1 h-8 w-8 rounded-full"
+                      title="Download message"
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                    {index > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRerun(index)}
+                        className="p-1 h-8 w-8 rounded-full"
+                        title="Rerun this query"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => toggleSpeech(index)}
+                      className="p-1 h-8 w-8 rounded-full"
+                      title={message.isSpeaking ? "Stop speaking" : "Speak this message"}
+                    >
+                      {message.isSpeaking ? (
+                        <VolumeX className="h-4 w-4" />
+                      ) : (
+                        <Volume2 className="h-4 w-4" />
+                      )}
+                    </Button>
                   </div>
                 )}
               </div>
             </div>
           ))}
-            {/* Loading Indicator - Corrected Icon Color and Text */}
             {isLoading && (
-              <div className="flex justify-start mb-4"> {/* Keep margin for spacing */}
-                <div className="bg-muted text-muted-foreground p-3 px-4 rounded-lg shadow-sm flex items-center gap-2"> {/* Use appropriate background */}
-                  <Bot className="h-4 w-4 animate-spin text-primary"/> {/* Added text-primary */}
-                  <span className="text-sm">AnalyticAI is thinking...</span> {/* Corrected text */}
+              <div className="flex justify-start mb-4">
+                <div className="bg-muted text-muted-foreground p-3 px-4 rounded-lg shadow-sm flex items-center gap-2">
+                  <Bot className="h-4 w-4 animate-spin text-primary" />
+                  <span className="text-sm">AnalyticAI is thinking...</span>
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Input Area */}
-        <div className="border-t border-border p-4 w-full bg-background">
-          <div className="flex items-end gap-3 max-w-4xl mx-auto">
-             <Textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder={listening ? "Listening..." : "Type message..."} onKeyPress={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (listening && transcript.trim()) { handleVoiceSend(); } else { handleSend(); } } }} className="flex-1 resize-none max-h-36 min-h-[40px] text-sm" rows={1} disabled={isLoading} />
-            <div className="flex flex-col gap-1.5">
-              {browserSupportsSpeechRecognition && ( <Button onClick={toggleListening} variant="outline" size="icon" className={`h-9 w-9 ${listening ? 'border-primary text-primary animate-pulse' : ''}`} title={listening ? "Stop listening" : "Start listening"} disabled={isLoading}> {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />} </Button> )}
-              <Button onClick={() => listening ? handleVoiceSend() : handleSend()} size="icon" className="h-9 w-9" disabled={isLoading || (!input.trim() && !transcript.trim())} title={listening ? "Send voice" : "Send text"}> <Send className="h-4 w-4" /> </Button>
+        <div className="border-t p-4 w-full">
+          <div className="flex gap-4 max-w-[1000px] mx-auto">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Type your message... (Markdown supported)"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+              className="flex-1 min-h-[60px] p-2 rounded-md border resize-none"
+              rows={2}
+              disabled={isLoading}
+            />
+            <div className="flex flex-col gap-2">
+              {browserSupportsSpeechRecognition && (
+                <Button
+                  onClick={toggleListening}
+                  variant="outline"
+                  className={`p-2 ${listening ? 'bg-primary text-primary-foreground' : ''}`}
+                  title={listening ? "Stop voice input" : "Start voice input"}
+                >
+                  {listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+                </Button>
+              )}
+              <Button 
+                onClick={handleSend} 
+                className="p-2"
+                disabled={isLoading}
+              >
+                <Send className="h-5 w-5" />
+              </Button>
             </div>
           </div>
-          {listening && ( <div className="mt-1.5 text-xs text-muted-foreground max-w-4xl mx-auto flex items-center gap-1"> <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div> <span>Listening... {transcript && <span className='italic'>"{transcript}"</span>}</span> </div> )}
+          {listening && (
+            <div className="mt-2 text-sm text-muted-foreground max-w-[1000px] mx-auto flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
+                <span>Listening... {transcript && `"${transcript}"`}</span>
+              </div>
+              {transcript && (
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  onClick={handleVoiceSend} 
+                  className="text-xs"
+                >
+                  Send voice message
+                </Button>
+              )}
+            </div>
+          )}
+          {!browserSupportsSpeechRecognition && (
+            <div className="mt-2 text-sm text-muted-foreground max-w-[1000px] mx-auto">
+              <span>Voice input is not supported in your browser. Try using Chrome for the best experience.</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

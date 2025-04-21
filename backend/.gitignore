@@ -2,5 +2,6 @@
 .venv
 #ignore .env
 .env
-#ignore pycache
+#ignore pycache and .pytest_cache
 __pycache__
+.pytest_cache
