@@ -119,73 +119,81 @@ export default function Chat() {
 
 
   // --- Speech Synthesis Handling ---
-  const toggleSpeech = (index: number, content: string) => {
-    const isCurrentlySpeaking = speakingIndex !== null;
-    const isClickedMessageSpeaking = isCurrentlySpeaking && speakingIndex === index;
-
-    if (isClickedMessageSpeaking) {
-      // STOPPING SPEECH
+  const toggleSpeech = (index: number) => {
+    // If this message is already speaking, stop it
+    if (speakingIndex === index) {
       window.speechSynthesis.cancel();
       setSpeakingIndex(null);
-      setMessages(prev => prev.map(msg => ({ ...msg, isSpeaking: false })));
-    } else {
-      // STARTING SPEECH
-      if (!isSpeechReady || voices.length === 0) {
-        setError("TTS engine initializing. Please wait."); return;
-      }
-      if (isCurrentlySpeaking) { window.speechSynthesis.cancel(); } // Cancel previous before starting new
-
-      setMessages(prev => prev.map((msg, i) => ({ ...msg, isSpeaking: i === index })));
-      setSpeakingIndex(index);
-
-      const utterance = new SpeechSynthesisUtterance(content);
-      const preferredVoice = voices.find(v => v.lang === 'en-US' && /Google|Natural/i.test(v.name))
-          || voices.find(v => v.lang === 'en-US') || voices.find(v => v.lang.startsWith('en-'));
-      utterance.voice = preferredVoice || voices[0] || null;
-
-      if (!utterance.voice) {
-          setError("No TTS voices available.");
-          setSpeakingIndex(null); setMessages(prev => prev.map(msg => ({ ...msg, isSpeaking: false })));
-          return;
-      }
-      utterance.rate = 1; utterance.pitch = 1;
-
-      // --- Refined Event Handlers ---
-      utterance.onend = () => {
-          if (speakingIndex === index) { // Check prevents race condition
-              setSpeakingIndex(null);
-              setMessages(prev => prev.map(msg => ({ ...msg, isSpeaking: false })));
-          }
-      };
-      utterance.onerror = (event) => {
-          const errorType = event.error || 'unknown';
-          const isCancellationError = errorType === 'interrupted' || errorType === 'canceled' || errorType === 'cancelled';
-
-          // Log differently based on type
-          if (!isCancellationError) {
-              console.error(`Speech synthesis error: ${errorType} on index ${index}`, event);
-              setError(`Speech synthesis failed: ${errorType}`); // Show only real errors
-          } else {
-              // Log cancellations for debugging but don't show error to user
-              console.log(`Speech synthesis intentionally stopped/cancelled: ${errorType} on index ${index}`);
-          }
-
-          // Always reset UI state if this was the speaking index
-          if (speakingIndex === index) {
-              setSpeakingIndex(null);
-              setMessages(prev => prev.map(msg => ({ ...msg, isSpeaking: false })));
-          }
-      };
-      // --- End Refined Event Handlers ---
-
-      window.speechSynthesis.speak(utterance);
+      setMessages(prevMessages => {
+        const newMessages = [...prevMessages];
+        // Make sure to mark all messages as not speaking
+        newMessages.forEach(msg => {
+          msg.isSpeaking = false;
+        });
+        return newMessages;
+      });
+      return;
     }
+    // Otherwise, stop any current speech and start this one
+    window.speechSynthesis.cancel();
+    setMessages(prevMessages => {
+      const newMessages = [...prevMessages];
+      // Mark all messages as not speaking
+      newMessages.forEach(msg => {
+        msg.isSpeaking = false;
+      });
+      // Mark this message as speaking
+      const message = newMessages[index];
+      message.isSpeaking = true;
+      // Create and configure the utterance
+      const utterance = new SpeechSynthesisUtterance(message.content);
+      // Try to get a good voice
+      const voices = window.speechSynthesis.getVoices();
+      if (voices && voices.length > 0) {
+        // Try to find a good English voice
+        const preferredVoice = voices.find(voice => 
+          voice.lang === 'en-US' || 
+          voice.name.includes('English') ||
+          voice.name.includes('Google')
+        );
+        utterance.voice = preferredVoice || voices[0];
+      }
+      // Set rate and pitch to normal values
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      // When speech ends, update the speaking state
+      utterance.onend = () => {
+        setSpeakingIndex(null);
+        setMessages(prev => {
+          const updatedMessages = [...prev];
+          updatedMessages.forEach(msg => {
+            msg.isSpeaking = false;
+          });
+          return updatedMessages;
+        });
+      };
+      // Handle errors
+      utterance.onerror = () => {
+        setSpeakingIndex(null);
+        setMessages(prev => {
+          const updatedMessages = [...prev];
+          updatedMessages.forEach(msg => {
+            msg.isSpeaking = false;
+          });
+          return updatedMessages;
+        });
+      };
+      // Start speaking and update the speaking index
+      window.speechSynthesis.speak(utterance);
+      setSpeakingIndex(index);
+      return newMessages;
+    });
   };
 
   // --- Other Utils ---
   const handleCopy = async (content: string, index: number) => { /* ... (no changes) ... */
     setError(null); if (!navigator.clipboard) { setError("Clipboard unavailable."); return; } try { let t = content; try { t = content.replace(/```[\s\S]*?```/g, '').replace(/`([^`]*)`/g, '$1').replace(/(\*\*|__)(.*?)\1/g, '$2').replace(/(\*|_)(.*?)\1/g, '$2').replace(/!\[.*?\]\(.*?\)/g, '').replace(/\[(.*?)\]\(.*?\)/g, '$1').replace(/^[#>*\-+\s]*/gm, '').trim(); } catch {} await navigator.clipboard.writeText(t); setCopiedIndex(index); setTimeout(() => setCopiedIndex(null), 2000); } catch (err) { console.error('Copy err:', err); setError('Failed to copy.'); }
-   };
+  };
   const handleDownloadMessage = (content: string) => { /* ... (no changes) ... */
     setError(null); try { let t = content; try { t = content.replace(/```[\s\S]*?```/g, '').replace(/`([^`]*)`/g, '$1').replace(/(\*\*|__)(.*?)\1/g, '$2').replace(/(\*|_)(.*?)\1/g, '$2').replace(/!\[.*?\]\(.*?\)/g, '').replace(/\[(.*?)\]\(.*?\)/g, '$1').replace(/^[#>*\-+\s]*/gm, '').trim(); } catch {} const b = new Blob([t], { type: 'text/plain;charset=utf-8' }); fileDownload(b, 'message.txt'); } catch (err) { console.error('Msg DL err:', err); setError('Failed to download message.'); }
   };
