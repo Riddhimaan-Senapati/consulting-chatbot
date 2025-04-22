@@ -19,13 +19,14 @@ app = FastAPI()
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3003"],  # Update with your frontend URL
+    allow_origins=["http://localhost:3000"],  # Update with your frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Connecting to MongoDB Database
+load_dotenv()
 client = motor.motor_asyncio.AsyncIOMotorClient(os.getenv("MONGODB_URL"))
 db = client.Consulting_data
 discussion_collection = db.get_collection("Discussion_data")

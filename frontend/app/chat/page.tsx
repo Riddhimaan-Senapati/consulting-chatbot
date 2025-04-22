@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Bot, Send, Home, Mic, MicOff, Volume2, VolumeX, Copy, Check, Download } from "lucide-react";
+import { Bot, Send, Home, Mic, MicOff, Volume2, VolumeX, Copy, Check, Download,RefreshCw } from "lucide-react";
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -78,26 +78,69 @@ export default function Chat() {
     }
   };
 
-
-
   const handleDownload = async () => {
-      // send get request "/download" to get collection from database
+    // send get request "/download" to get collection from database
 
-      try{
-        const response = await fetch('http://127.0.0.1:8001/download', {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/pdf'
-        }
-        });
-        // response contains pdf file
-        const blob = await response.blob();
-        fileDownload(blob, "Consultation.pdf");
-        
-      }catch(error){
-        console.log(error);
+    try{
+      const response = await fetch('http://127.0.0.1:8001/download', {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/pdf'
       }
+      });
+      // response contains pdf file
+      const blob = await response.blob();
+      fileDownload(blob, "Consultation.pdf");
+      
+    }catch(error){
+      console.log(error);
+    }
 
+  };
+
+  const handleRerun = async (botMessageIndex: number) => {
+    if (isLoading || botMessageIndex <= 0) return;
+    setIsLoading(true);
+    const userMessageIndex = botMessageIndex - 1;
+    if (userMessageIndex < 0 || messages[userMessageIndex]?.type !== 'user') {
+      setIsLoading(false);
+      return;
+    }
+    const userMessageToRerun = messages[userMessageIndex];
+    const historyForApi = messages.slice(0, userMessageIndex).map(msg => [
+      msg.type === 'user' ? 'human' : 'ai',
+      msg.content
+    ] as [string, string]);
+    historyForApi.push(['human', userMessageToRerun.content]);
+    try {
+      const response = await fetch('http://127.0.0.1:8001/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: historyForApi,
+          user_input: userMessageToRerun.content
+        }),
+      });
+      if (!response.ok) {
+        throw new Error('API request failed');
+      }
+      const data: AnalysisResponse = await response.json();
+      setMessages(prev => {
+        const uM = [...prev];
+        if (botMessageIndex < uM.length && uM[botMessageIndex].type === 'bot') {
+          uM[botMessageIndex] = { type: 'bot', content: data.response, isSpeaking: false };
+        } else {
+          console.error("Rerun index mismatch");
+        }
+        return uM;
+      });
+    } catch (err: any) {
+      console.error('Rerun Error:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSend = async () => {
@@ -299,17 +342,15 @@ export default function Chat() {
           <ThemeToggle />
 
           <Link href="/">
-            <Button variant="outline" className="w-full">
-              <Home className="mr-2 h-4 w-4" />
-                Back to Home
-            </Button>
+            <Button variant="outline" className="w-full flex items-center justify-start h-12 px-4 gap-2">
+  <Home className="h-5 w-5" />
+  Back to Home
+</Button>
           </Link>
-          <Link href="">   {/* How to get item id ? */}
-            <Button variant="outline" className="w-full" onClick={handleDownload}>
-              <Home className="mr-2 h-4 w-4"/>
-                Download Chat
-            </Button>
-          </Link>
+          <Button variant="outline" className="w-full flex items-center justify-start h-12 px-4 gap-2" onClick={handleDownload}>
+  <Download className="h-5 w-5" />
+  Download Chat
+</Button>
           
 
         </div>
@@ -438,6 +479,17 @@ export default function Chat() {
                     >
                       <Download className="h-4 w-4" />
                     </Button>
+                    {index > 0 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRerun(index)}
+                        className="p-1 h-8 w-8 rounded-full"
+                        title="Rerun this query"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -458,12 +510,9 @@ export default function Chat() {
           ))}
             {isLoading && (
               <div className="flex justify-start mb-4">
-                <div className="bg-secondary text-secondary-foreground max-w-[80%] p-4 rounded-lg">
-                  <div className="flex gap-2">
-                    <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                  </div>
+                <div className="bg-muted text-muted-foreground p-3 px-4 rounded-lg shadow-sm flex items-center gap-2">
+                  <Bot className="h-4 w-4 animate-spin text-primary" />
+                  <span className="text-sm">AnalyticAI is thinking...</span>
                 </div>
               </div>
             )}
