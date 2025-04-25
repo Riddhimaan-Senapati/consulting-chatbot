@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Bot, Send, Home, Mic, MicOff, Volume2, VolumeX, Copy, Check, Download,RefreshCw } from "lucide-react";
+import { Bot, Send, Home, Mic, MicOff, Volume2, VolumeX, Copy, Check, Download, RefreshCw, ListTodo } from "lucide-react";
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import { ThemeToggle } from "@/components/ui/theme-toggle";
@@ -345,6 +345,12 @@ export default function Chat() {
             <Button variant="outline" className="w-full flex items-center justify-start h-12 px-4 gap-2">
   <Home className="h-5 w-5" />
   Back to Home
+</Button>
+          </Link>
+          <Link href="/plans">
+            <Button variant="outline" className="w-full flex items-center justify-start h-12 px-4 gap-2">
+  <ListTodo className="h-5 w-5" />
+  Plans Board
 </Button>
           </Link>
           <Button variant="outline" className="w-full flex items-center justify-start h-12 px-4 gap-2" onClick={handleDownload}>

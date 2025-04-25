@@ -29,6 +29,12 @@ Hiring business consultants can be **expensive** and often out of reach for smal
   - **Porter's Five Forces Analysis** – Assesses industry competition and attractiveness through five key forces: competitive rivalry, threat of new entrants, bargaining power of suppliers, bargaining power of buyers, and threat of substitutes.
   - **Business Model Canvas Analysis** – Provides a comprehensive view of a business model through nine building blocks: customer segments, value propositions, channels, customer relationships, revenue streams, key resources, key activities, key partnerships, and cost structure.
 
+- **Strategy Plans Board**  
+  - **Create, track, and manage your strategic plans** with a visual board divided into three sections: To Do, In Progress, and Done.  
+  - **Add new plans** directly from the board, move them between stages, and mark them as complete to stay accountable.  
+  - **Complements the chatbot's strategy features** by helping you turn AI-generated insights and recommendations into actionable tasks that you can organize and complete.  
+  - Access the board from the main navigation as "Plans Board".
+
 - **Real-Time Business Insights**  
   - Leverages **web-sourced** data to provide up-to-date information.  
   - Helps businesses adapt to market changes in real time.  
