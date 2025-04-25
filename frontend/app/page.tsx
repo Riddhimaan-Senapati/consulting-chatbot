@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from "@/components/ui/button";
-import { Bot, BarChart3, Brain, LineChart, LogIn, UserPlus } from "lucide-react";
+import { Bot, BarChart3, Brain, LineChart, LogIn, UserPlus, ListTodo } from "lucide-react";
 import Link from 'next/link';
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
@@ -16,6 +16,12 @@ export default function Home() {
             <span className="text-2xl font-bold">AnalyticAI</span>
           </div>
           <div className="flex gap-4 items-center">
+            <Link href="/plans">
+              <Button variant="secondary">
+                <ListTodo className="mr-2 h-4 w-4" />
+                Plans Board
+              </Button>
+            </Link>
             <ThemeToggle />
             <Button variant="outline">
               <LogIn className="mr-2 h-4 w-4" />
@@ -45,7 +51,7 @@ export default function Home() {
 
       {/* Features Section */}
       <div className="container mx-auto px-4 py-16">
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-4 gap-8">
           <div className="bg-card p-6 rounded-lg">
             <BarChart3 className="h-12 w-12 text-primary mb-4" />
             <h3 className="text-xl font-semibold mb-2">SWOT Analysis</h3>
@@ -65,6 +71,13 @@ export default function Home() {
             <h3 className="text-xl font-semibold mb-2">PESTLE Analysis</h3>
             <p className="text-muted-foreground">
               Comprehensive analysis of Political, Economic, Social, Technological, Legal, and Environmental factors.
+            </p>
+          </div>
+          <div className="bg-card p-6 rounded-lg">
+            <ListTodo className="h-12 w-12 text-primary mb-4" />
+            <h3 className="text-xl font-semibold mb-2">Plans Board</h3>
+            <p className="text-muted-foreground">
+              Organize, track, and manage your strategic plans in one place. Use drag-and-drop to move tasks between status columns and keep your team aligned.
             </p>
           </div>
         </div>
