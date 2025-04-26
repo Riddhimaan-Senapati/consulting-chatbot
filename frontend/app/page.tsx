@@ -23,14 +23,18 @@ export default function Home() {
               </Button>
             </Link>
             <ThemeToggle />
-            <Button variant="outline">
-              <LogIn className="mr-2 h-4 w-4" />
-              Login
-            </Button>
-            <Button>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Sign Up
-            </Button>
+            <Link href="/login">
+              <Button variant="outline">
+                <LogIn className="mr-2 h-4 w-4" />
+                Login
+              </Button>
+            </Link>
+            <Link href="/signup">
+              <Button>
+                <UserPlus className="mr-2 h-4 w-4" />
+                Sign Up
+              </Button>
+            </Link>
           </div>
         </nav>
 
