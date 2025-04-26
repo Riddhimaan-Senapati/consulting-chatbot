@@ -3,14 +3,14 @@
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Bot, Send, Home, Mic, MicOff, Volume2, VolumeX, Copy, Check, Download, RefreshCw, ListTodo } from "lucide-react";
+import { useTextToSpeech } from "@/components/useTextToSpeech";
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
-// const fileDownload = require("js-file-download");
 import fileDownload from "js-file-download";
-import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
+import { useVoiceDictation } from "@/components/useVoiceDictation";
 
 
 
@@ -37,46 +37,32 @@ export default function Chat() {
       isSpeaking: false
     }
   ]);
-  const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const { speakingId, speak, stop } = useTextToSpeech();
 
   const {
-    transcript,
+    input,
+    setInput,
     listening,
-    resetTranscript,
-    browserSupportsSpeechRecognition,
-    isMicrophoneAvailable
-  } = useSpeechRecognition();
+    toggleListening,
+    browserSupportsSpeechRecognition
+  } = useVoiceDictation('');
 
   // Update input field with transcript when voice input changes
   useEffect(() => {
-    if (transcript) {
-      setInput(transcript);
+    if (input) {
+      setInput(input);
     }
-  }, [transcript]);
-
-  // Toggle voice recognition
-  const toggleListening = () => {
-    if (listening) {
-      SpeechRecognition.stopListening();
-      setIsListening(false);
-    } else {
-      SpeechRecognition.startListening({ continuous: true, language: 'en-US' });
-      setIsListening(true);
-      resetTranscript();
-    }
-  };
+  }, [input]);
 
   // Handle voice send
   const handleVoiceSend = () => {
-    if (transcript.trim()) {
+    if (input.trim()) {
       handleSend();
-      resetTranscript();
     }
-  };
+  }
 
   const handleDownload = async () => {
     // send get request "/download" to get collection from database
@@ -141,7 +127,7 @@ export default function Chat() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -197,89 +183,14 @@ export default function Chat() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
-  const toggleSpeech = (index: number) => {
-    // If this message is already speaking, stop it
-    if (speakingIndex === index) {
-      window.speechSynthesis.cancel();
-      setSpeakingIndex(null);
-      
-      setMessages(prevMessages => {
-        const newMessages = [...prevMessages];
-        // Make sure to mark all messages as not speaking
-        newMessages.forEach(msg => {
-          msg.isSpeaking = false;
-        });
-        return newMessages;
-      });
-      return;
+  const toggleSpeech = (index: number, text: string) => {
+    if (speakingId === index) {
+      stop();
+    } else {
+      speak(index, text);
     }
-    
-    // Otherwise, stop any current speech and start this one
-    window.speechSynthesis.cancel();
-    
-    setMessages(prevMessages => {
-      const newMessages = [...prevMessages];
-      
-      // Mark all messages as not speaking
-      newMessages.forEach(msg => {
-        msg.isSpeaking = false;
-      });
-      
-      // Mark this message as speaking
-      const message = newMessages[index];
-      message.isSpeaking = true;
-      
-      // Create and configure the utterance
-      const utterance = new SpeechSynthesisUtterance(message.content);
-      
-      // Try to get a good voice
-      const voices = window.speechSynthesis.getVoices();
-      if (voices && voices.length > 0) {
-        // Try to find a good English voice
-        const preferredVoice = voices.find(voice => 
-          voice.lang === 'en-US' || 
-          voice.name.includes('English') ||
-          voice.name.includes('Google')
-        );
-        utterance.voice = preferredVoice || voices[0];
-      }
-      
-      // Set rate and pitch to normal values
-      utterance.rate = 1;
-      utterance.pitch = 1;
-      
-      // When speech ends, update the speaking state
-      utterance.onend = () => {
-        setSpeakingIndex(null);
-        setMessages(prev => {
-          const updatedMessages = [...prev];
-          updatedMessages.forEach(msg => {
-            msg.isSpeaking = false;
-          });
-          return updatedMessages;
-        });
-      };
-      
-      // Handle errors
-      utterance.onerror = () => {
-        setSpeakingIndex(null);
-        setMessages(prev => {
-          const updatedMessages = [...prev];
-          updatedMessages.forEach(msg => {
-            msg.isSpeaking = false;
-          });
-          return updatedMessages;
-        });
-      };
-      
-      // Start speaking and update the speaking index
-      window.speechSynthesis.speak(utterance);
-      setSpeakingIndex(index);
-      
-      return newMessages;
-    });
   };
 
   const handleCopy = async (content: string, index: number) => {
@@ -367,9 +278,9 @@ export default function Chat() {
         {/* Chat Messages */}
         <div className="flex-1 overflow-y-auto p-4 w-full">
           <div className="max-w-[1000px] mx-auto">
-          {messages.map((message, index) => (
+          {messages.map((message, idx) => (
             <div
-              key={index}
+              key={idx}
               className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
             >
               <div
@@ -466,11 +377,11 @@ export default function Chat() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleCopy(message.content, index)}
+                      onClick={() => handleCopy(message.content, idx)}
                       className="p-1 h-8 w-8 rounded-full"
                       title="Copy to clipboard"
                     >
-                      {copiedIndex === index ? (
+                      {copiedIndex === idx ? (
                         <Check className="h-4 w-4 text-green-500" />
                       ) : (
                         <Copy className="h-4 w-4" />
@@ -485,30 +396,24 @@ export default function Chat() {
                     >
                       <Download className="h-4 w-4" />
                     </Button>
-                    {index > 0 && (
+                    {idx > 0 && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => handleRerun(index)}
+                        onClick={() => handleRerun(idx)}
                         className="p-1 h-8 w-8 rounded-full"
                         title="Rerun this query"
                       >
                         <RefreshCw className="h-4 w-4" />
                       </Button>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => toggleSpeech(index)}
-                      className="p-1 h-8 w-8 rounded-full"
-                      title={message.isSpeaking ? "Stop speaking" : "Speak this message"}
+                    <button
+                      className={`ml-2 p-1 rounded ${speakingId === idx ? 'bg-primary text-white' : 'hover:bg-muted'} transition`}
+                      onClick={() => toggleSpeech(idx, message.content)}
+                      title={speakingId === idx ? 'Stop speaking' : 'Speak message'}
                     >
-                      {message.isSpeaking ? (
-                        <VolumeX className="h-4 w-4" />
-                      ) : (
-                        <Volume2 className="h-4 w-4" />
-                      )}
-                    </Button>
+                      {speakingId === idx ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                    </button>
                   </div>
                 )}
               </div>
@@ -566,9 +471,9 @@ export default function Chat() {
             <div className="mt-2 text-sm text-muted-foreground max-w-[1000px] mx-auto flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-primary animate-pulse"></div>
-                <span>Listening... {transcript && `"${transcript}"`}</span>
+                <span>Listening... {input && `"${input}"`}</span>
               </div>
-              {transcript && (
+              {input && (
                 <Button 
                   size="sm" 
                   variant="ghost" 

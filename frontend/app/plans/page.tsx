@@ -1,10 +1,12 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { ListTodo, Loader2, CheckCircle2, Bot, MessageSquare, Home as HomeIcon } from 'lucide-react';
+import { ListTodo, Loader2, CheckCircle2, Bot, MessageSquare, Home as HomeIcon, Mic, MicOff, Pencil, X, Check as CheckIcon, Trash2, Volume2 } from 'lucide-react';
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Button } from '@/components/ui/button';
+import { useVoiceDictation } from "@/components/useVoiceDictation";
+import { useTextToSpeech } from "@/components/useTextToSpeech";
 
 interface Plan {
   id: number;
@@ -14,12 +16,61 @@ interface Plan {
 const initialPlans: Plan[] = [];
 
 const PlansPage = () => {
+  // Use the modular text-to-speech hook
+  const { speakingId, speak, stop } = useTextToSpeech();
+  function togglePlanSpeech(colId: string, planId: number, text: string) {
+    const id = `${colId}-${planId}`;
+    if (speakingId === id) {
+      stop();
+    } else {
+      speak(id, text);
+    }
+  }
+  // Delete a plan with confirmation
+  function handleDeletePlan(colId: string, planId: number) {
+    if (window.confirm('Are you sure you want to delete this plan?')) {
+      setColumns(prev => {
+        const updated = { ...prev };
+        const col = updated[colId as keyof typeof prev];
+        updated[colId as keyof typeof prev] = {
+          ...col,
+          items: col.items.filter(plan => plan.id !== planId)
+        };
+        return updated;
+      });
+      if (editing && editing.col === colId && editing.id === planId) {
+        setEditing(null);
+      }
+    }
+  }
+  // Save the edited plan text
+  function handleSaveEdit() {
+    if (!editing) return;
+    setColumns(prev => {
+      const updated = { ...prev };
+      const col = updated[editing.col as keyof typeof prev];
+      updated[editing.col as keyof typeof prev] = {
+        ...col,
+        items: col.items.map(plan => plan.id === editing.id ? { ...plan, text: editing.text } : plan)
+      };
+      return updated;
+    });
+    setEditing(null);
+  }
+  const [editing, setEditing] = useState<{col: string, id: number, text: string} | null>(null);
   const [columns, setColumns] = useState({
     todo: { name: 'To Do', items: initialPlans },
     inProgress: { name: 'In Progress', items: [] as Plan[] },
     done: { name: 'Done', items: [] as Plan[] },
   });
-  const [input, setInput] = useState('');
+  const {
+    input,
+    setInput,
+    listening,
+    toggleListening,
+    browserSupportsSpeechRecognition
+  } = useVoiceDictation('');
+
   const [idCounter, setIdCounter] = useState(1);
 
   const addPlan = () => {
@@ -105,6 +156,17 @@ const PlansPage = () => {
             onChange={e => setInput(e.target.value)}
             placeholder="Add a new plan..."
           />
+          {browserSupportsSpeechRecognition && (
+            <Button
+              type="button"
+              variant="outline"
+              className={`rounded-none ${listening ? 'bg-primary text-primary-foreground' : ''}`}
+              onClick={toggleListening}
+              title={listening ? 'Stop voice input' : 'Start voice input'}
+            >
+              {listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+            </Button>
+          )}
           <button
             className="bg-primary text-white px-5 py-2 rounded-r-md font-medium hover:bg-primary/90 transition"
             onClick={addPlan}
@@ -137,7 +199,47 @@ const PlansPage = () => {
                               {colId === 'todo' && <ListTodo className="text-primary w-5 h-5 shrink-0" />}
                               {colId === 'inProgress' && <Loader2 className="text-yellow-500 animate-spin w-5 h-5 shrink-0" />}
                               {colId === 'done' && <CheckCircle2 className="text-green-600 w-5 h-5 shrink-0" />}
-                              <span className={`ml-1 text-base ${colId === 'done' ? 'opacity-60 line-through' : ''}`}>{plan.text}</span>
+                              {editing && editing.col === colId && editing.id === plan.id ? (
+                                <>
+                                  <input
+                                    className="border rounded px-2 py-1 text-base flex-1"
+                                    value={editing.text}
+                                    onChange={e => setEditing({...editing, text: e.target.value})}
+                                    autoFocus
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') handleSaveEdit();
+                                      if (e.key === 'Escape') setEditing(null);
+                                    }}
+                                  />
+                                  <button className="ml-1 text-green-600 hover:text-green-800" onClick={handleSaveEdit} title="Save"><CheckIcon className="w-4 h-4" /></button>
+                                  <button className="ml-1 text-red-500 hover:text-red-700" onClick={() => setEditing(null)} title="Cancel"><X className="w-4 h-4" /></button>
+                                </>
+                              ) : (
+                                <>
+                                  <span className={`ml-1 text-base ${colId === 'done' ? 'opacity-60 line-through' : ''}`}>{plan.text}</span>
+                                  <button
+                                    className={`ml-1 ${speakingId === `${colId}-${plan.id}` ? 'text-primary' : 'text-gray-400 hover:text-primary'}`}
+                                    onClick={() => togglePlanSpeech(colId, plan.id, plan.text)}
+                                    title={speakingId === `${colId}-${plan.id}` ? 'Stop speaking' : 'Speak plan'}
+                                  >
+                                    <Volume2 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    className="ml-1 text-gray-400 hover:text-primary"
+                                    onClick={() => setEditing({col: colId, id: plan.id, text: plan.text})}
+                                    title="Edit plan"
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    className="ml-1 text-red-400 hover:text-red-600"
+                                    onClick={() => handleDeletePlan(colId, plan.id)}
+                                    title="Delete plan"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           )}
                         </Draggable>
