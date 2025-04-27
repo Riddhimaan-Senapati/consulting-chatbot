@@ -12,8 +12,9 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi.responses import FileResponse
 import pandas as pd
-from fpdf import FPDF
-import os
+from fpdf import FPDF 
+from passlib.context import CryptContext
+from fastapi import HTTPException
 
 app = FastAPI()
 # Add CORS middleware
@@ -30,6 +31,7 @@ load_dotenv()
 client = motor.motor_asyncio.AsyncIOMotorClient(os.getenv("MONGODB_URL"))
 db = client.Consulting_data
 discussion_collection = db.get_collection("Discussion_data")
+user_collection = db.get_collection("User_data")
 
 # Represents an ObjectId field in the database.
 # It will be represented as a `str` on the model so that it can be serialized to JSON.
@@ -48,11 +50,14 @@ class AnalysisResponse(BaseModel):
     response: str
     full_history: List[Tuple[str,str]]
 
+class User(BaseModel):
+    id: Optional[PyObjectId] = Field(alias="_id", default=None)
+    email: EmailStr
+    password: str
+
 @app.get("/")
 async def health_check():
     return {"status": "active", "version": "1.0.0"}
-
-
 
 @app.get("/download/")
 async def download_analysis(format: str = Query("pdf")):
@@ -114,6 +119,35 @@ async def analyze(request: AnalysisRequest = Body(...)):
         full_history = result_chat["full_history"],
     )
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+@app.post("/auth/signup")
+async def signup(user: User):
+    # Check if user already exists
+    existing_user = await user_collection.find_one({"email": user.email})
+    if existing_user:
+        return {"error": "User already exists"}
+
+    # Hash the password before storing
+    hashed_password = pwd_context.hash(user.password)
+    user_dict = user.dict()
+    user_dict["password"] = hashed_password
+
+    # Insert user into database
+    new_user = await user_collection.insert_one(user_dict)
+
+    return {"message": "User created successfully", "user_id": str(new_user.inserted_id)}
+
+@app.post("/auth/login")
+async def login(user: User):
+    existing_user = await user_collection.find_one({"email": user.email})
+    if not existing_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not pwd_context.verify(user.password, existing_user["password"]):
+        raise HTTPException(status_code=400, detail="Incorrect password")
+
+    return {"message": "Login successful", "user_id": str(existing_user["_id"])}
 
 if __name__ == "__main__":
     import uvicorn

@@ -4,12 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Bot } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 export default function SignupPage() {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,7 +21,7 @@ export default function SignupPage() {
       return;
     }
 
-    const res = await fetch('http://localhost:8000/api/signup', {
+    const res = await fetch('http://localhost:8000/auth/signup', { // <-- Fixed endpoint
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
@@ -26,10 +29,10 @@ export default function SignupPage() {
 
     if (res.ok) {
       alert('Account created! Please log in.');
-      window.location.href = '/login';
+      router.push('/auth/login'); // <-- Use router.push for better navigation
     } else {
       const error = await res.json();
-      alert(`Error: ${error.detail}`);
+      setError(error.detail || 'Something went wrong.');
     }
   };
 
@@ -63,11 +66,13 @@ export default function SignupPage() {
             type="password"
             required
           />
+          {error && <p className="text-center text-red-500 text-sm">{error}</p>}
           <Button type="submit" className="w-full">
             Sign Up
           </Button>
           <p className="text-center text-muted-foreground text-sm mt-4">
-            Already have an account? <Link href="/login" className="text-primary underline">Login</Link>
+            Already have an account?{' '}
+            <Link href="/auth/login" className="text-primary underline">Login</Link>
           </p>
           <p className="text-center text-muted-foreground text-sm mt-2">
             <Link href="/" className="underline">← Back to Home</Link>
