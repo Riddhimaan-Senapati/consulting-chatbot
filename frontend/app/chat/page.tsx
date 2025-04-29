@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { Bot, Send, Home, Mic, MicOff, Volume2, VolumeX, Copy, Check, Download, RefreshCw, ListTodo } from "lucide-react";
+// Added PanelLeftClose and PanelRightClose for the sidebar toggle button
+import { Bot, Send, Home, Mic, MicOff, Volume2, VolumeX, Copy, Check, Download, RefreshCw, ListTodo, PanelLeftClose, PanelRightClose } from "lucide-react";
 import { useTextToSpeech } from "@/components/useTextToSpeech";
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
@@ -40,6 +41,7 @@ export default function Chat() {
   const [isLoading, setIsLoading] = useState(false);
   const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(true); // State for sidebar visibility
   const { speakingId, speak, stop } = useTextToSpeech();
 
   const {
@@ -77,7 +79,7 @@ export default function Chat() {
       // response contains pdf file
       const blob = await response.blob();
       fileDownload(blob, "Consultation.pdf");
-      
+
     }catch(error){
       console.log(error);
     }
@@ -141,10 +143,10 @@ export default function Chat() {
     try {
       // Convert messages to the format expected by the backend
       const apiMessages = messages.map(msg => [
-        msg.type === 'user' ? 'human' : 'ai', 
+        msg.type === 'user' ? 'human' : 'ai',
         msg.content
       ]);
-      
+
       // Add the new user message
       apiMessages.push(['human', userMessage.content]);
 
@@ -165,7 +167,7 @@ export default function Chat() {
       }
 
       const data: AnalysisResponse = await response.json();
-      
+
       // Add bot response to chat
       setMessages(prev => [...prev, {
         type: 'bot',
@@ -199,10 +201,10 @@ export default function Chat() {
       const tempElement = document.createElement('div');
       tempElement.innerHTML = content;
       const textContent = tempElement.textContent || tempElement.innerText || content;
-      
+
       await navigator.clipboard.writeText(textContent);
       setCopiedIndex(index);
-      
+
       // Reset the copied status after 2 seconds
       setTimeout(() => {
         setCopiedIndex(null);
@@ -229,6 +231,9 @@ export default function Chat() {
     }
   };
 
+  // Function to toggle sidebar visibility
+  const toggleSidebar = () => setIsSidebarVisible(!isSidebarVisible);
+
   // Mark component as mounted to avoid SSR hydration issues
   useEffect(() => {
     setMounted(true);
@@ -242,41 +247,57 @@ export default function Chat() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-background overflow-hidden"> {/* Added overflow-hidden to prevent main scroll */}
       {/* Sidebar */}
-      <div className="w-64 bg-card border-r p-4 flex-shrink-0">
-        <div className="flex items-center gap-2 mb-8">
-          <Bot className="h-8 w-8 text-primary" />
-          <span className="text-2xl font-bold">AnalyticAI</span>
-        </div>
-        <div className="flex flex-col gap-4">
-          <ThemeToggle />
+      {/* Added transition classes and conditional width/padding/border */}
+      <div className={`bg-card flex-shrink-0 transition-all duration-300 ease-in-out ${isSidebarVisible ? 'w-64 p-4 border-r' : 'w-0 p-0 border-r-0 overflow-hidden'}`}>
+        {/* Wrap content for smooth fade */}
+        <div className={`transition-opacity duration-200 ${isSidebarVisible ? 'opacity-100' : 'opacity-0 delay-100'}`}>
+            <div className="flex items-center gap-2 mb-8">
+              <Bot className="h-8 w-8 text-primary" />
+              <span className="text-2xl font-bold whitespace-nowrap">AnalyticAI</span> {/* Added whitespace-nowrap */}
+            </div>
+            <div className="flex flex-col gap-4">
+              <ThemeToggle />
 
-          <Link href="/">
-            <Button variant="outline" className="w-full flex items-center justify-start h-12 px-4 gap-2">
-  <Home className="h-5 w-5" />
-  Back to Home
-</Button>
-          </Link>
-          <Link href="/plans">
-            <Button variant="outline" className="w-full flex items-center justify-start h-12 px-4 gap-2">
-  <ListTodo className="h-5 w-5" />
-  Plans Board
-</Button>
-          </Link>
-          <Button variant="outline" className="w-full flex items-center justify-start h-12 px-4 gap-2" onClick={handleDownload}>
-  <Download className="h-5 w-5" />
-  Download Chat
-</Button>
-          
-
+              <Link href="/">
+                <Button variant="outline" className="w-full flex items-center justify-start h-12 px-4 gap-2">
+                  <Home className="h-5 w-5" />
+                  <span className="whitespace-nowrap">Back to Home</span> {/* Added whitespace-nowrap */}
+                </Button>
+              </Link>
+              <Link href="/plans">
+                <Button variant="outline" className="w-full flex items-center justify-start h-12 px-4 gap-2">
+                  <ListTodo className="h-5 w-5" />
+                  <span className="whitespace-nowrap">Plans Board</span> {/* Added whitespace-nowrap */}
+                </Button>
+              </Link>
+              <Button variant="outline" className="w-full flex items-center justify-start h-12 px-4 gap-2" onClick={handleDownload}>
+                <Download className="h-5 w-5" />
+                <span className="whitespace-nowrap">Download Chat</span> {/* Added whitespace-nowrap */}
+              </Button>
+            </div>
         </div>
       </div>
 
       {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      {/* Added relative positioning for the toggle button */}
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Sidebar Toggle Button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={toggleSidebar}
+          className="absolute top-4 left-4 z-10 bg-card hover:bg-accent rounded-full shadow" // Positioned button
+          title={isSidebarVisible ? "Hide Sidebar" : "Show Sidebar"}
+        >
+          {/* Toggle icon based on sidebar visibility */}
+          {isSidebarVisible ? <PanelLeftClose className="h-5 w-5" /> : <PanelRightClose className="h-5 w-5" />}
+        </Button>
+
         {/* Chat Messages */}
-        <div className="flex-1 overflow-y-auto p-4 w-full">
+        {/* Increased padding-top (pt-16) to prevent content from hiding under the button */}
+        <div className="flex-1 overflow-y-auto p-4 pt-16 w-full">
           <div className="max-w-[1000px] mx-auto">
           {messages.map((message, idx) => (
             <div
@@ -326,8 +347,8 @@ export default function Chat() {
                       a: ({node, href, children, ...props}) => {
                         if (!href) return <>{children}</>;
                         return (
-                          <a 
-                            href={href} 
+                          <a
+                            href={href}
                             className="text-blue-500 hover:underline"
                             target="_blank"
                             rel="noopener noreferrer"
@@ -370,7 +391,7 @@ export default function Chat() {
                     {message.content}
                   </ReactMarkdown>
                 </div>
-                
+
                 {/* Action buttons for bot messages */}
                 {message.type === 'bot' && (
                   <div className="flex justify-end mt-3 gap-2 border-t pt-2 border-border/40">
@@ -458,8 +479,8 @@ export default function Chat() {
                   {listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
                 </Button>
               )}
-              <Button 
-                onClick={handleSend} 
+              <Button
+                onClick={handleSend}
                 className="p-2"
                 disabled={isLoading}
               >
@@ -474,10 +495,10 @@ export default function Chat() {
                 <span>Listening... {input && `"${input}"`}</span>
               </div>
               {input && (
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  onClick={handleVoiceSend} 
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleVoiceSend}
                   className="text-xs"
                 >
                   Send voice message
