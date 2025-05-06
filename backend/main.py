@@ -17,10 +17,10 @@ from passlib.context import CryptContext
 from fastapi import HTTPException
 
 app = FastAPI()
-# Add CORS middleware
+# Added CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Update with your frontend URL
+    allow_origins=["http://localhost:3000"],  # Update with the frontend URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,8 +37,11 @@ user_collection = db.get_collection("User_data")
 # It will be represented as a `str` on the model so that it can be serialized to JSON.
 PyObjectId = Annotated[str, BeforeValidator(str)]
 
+#chain that calls the LLM. Note: This is because of Langgraph that we are using in
+#graph.py which requires this to be a chain
 analysis_chain = initialize_workflow()
 
+#MongoDb classes for Requests, Responses and users
 class AnalysisRequest(BaseModel):
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
     messages: List[Tuple[str, str]]
@@ -55,10 +58,12 @@ class User(BaseModel):
     email: EmailStr
     password: str
 
+#status check API route
 @app.get("/")
 async def health_check():
     return {"status": "active", "version": "1.0.0"}
 
+#API for downloading the chats
 @app.get("/download/")
 async def download_analysis(format: str = Query("pdf")):
     # Fetch analysis report from MongoDB
@@ -89,6 +94,7 @@ async def download_analysis(format: str = Query("pdf")):
     # Return file as response
     return FileResponse(path=file_path, filename=file_path, media_type="application/octet-stream")
 
+# main API for communicating with the LLM and storing it in the database
 @app.post("/analyze/", response_model = AnalysisResponse)
 async def analyze(request: AnalysisRequest = Body(...)):
     state = {
@@ -119,8 +125,10 @@ async def analyze(request: AnalysisRequest = Body(...)):
         full_history = result_chat["full_history"],
     )
 
+#use bcrypt for password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+# API for signup
 @app.post("/auth/signup")
 async def signup(user: User):
     # Check if user already exists
@@ -130,7 +138,7 @@ async def signup(user: User):
 
     # Hash the password before storing
     hashed_password = pwd_context.hash(user.password)
-    user_dict = user.dict()
+    user_dict = user.model_dump()
     user_dict["password"] = hashed_password
 
     # Insert user into database
@@ -138,6 +146,7 @@ async def signup(user: User):
 
     return {"message": "User created successfully", "user_id": str(new_user.inserted_id)}
 
+#API for Login
 @app.post("/auth/login")
 async def login(user: User):
     existing_user = await user_collection.find_one({"email": user.email})

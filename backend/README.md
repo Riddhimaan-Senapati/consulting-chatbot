@@ -14,8 +14,16 @@ Make sure you have the following installed on your machine:
 - Python 3.7 or higher
 - pip (Python package installer)
 
-You also need to have a TAVILY API and GEMINI API keys to be set up in a .env file in the backend folder. 
-There is a .env.example file where the keys are defined, just copy these in your .env file with API key values.
+You also need to have a MongoDB cluster URL, TAVILY API and GEMINI API keys to be set up in a .env file in the backend folder. 
+
+There is a .env.example file where the keys are defined, just copy these in your .env file using
+
+```
+cp .env.example .env
+```
+
+and then fill the .env file with API key values.
+
 Remember to never commit .env files
 
 # 2. Create a Virtual Environment
