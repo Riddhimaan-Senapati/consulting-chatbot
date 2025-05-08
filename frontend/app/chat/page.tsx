@@ -70,7 +70,7 @@ export default function Chat() {
     // send get request "/download" to get collection from database
 
     try{
-      const response = await fetch('http://127.0.0.1:8001/download', {
+      const response = await fetch('http://127.0.0.1:8000/download', {
         method: 'GET',
         headers: {
           'Accept': 'application/pdf'
@@ -101,7 +101,7 @@ export default function Chat() {
     ] as [string, string]);
     historyForApi.push(['human', userMessageToRerun.content]);
     try {
-      const response = await fetch('http://127.0.0.1:8001/analyze', {
+      const response = await fetch('http://127.0.0.1:8000/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -151,7 +151,7 @@ export default function Chat() {
       apiMessages.push(['human', userMessage.content]);
 
       // Call the backend API
-      const response = await fetch('http://127.0.0.1:8001/analyze', {
+      const response = await fetch('http://127.0.0.1:8000/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
