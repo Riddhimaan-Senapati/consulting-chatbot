@@ -12,8 +12,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import fileDownload from "js-file-download";
 import { useVoiceDictation } from "@/components/useVoiceDictation";
-
-
+import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 
 interface Message {
   type: 'user' | 'bot';
@@ -27,7 +26,7 @@ interface AnalysisResponse {
   full_history: [string, string][];
 }
 
-
+const API_BASE_URL = 'http://127.0.0.1:8000'; // Added API_BASE_URL
 
 export default function Chat() {
   const [mounted, setMounted] = useState(false);
@@ -52,12 +51,17 @@ export default function Chat() {
     browserSupportsSpeechRecognition
   } = useVoiceDictation('');
 
+  const {
+    transcript,
+    resetTranscript
+  } = useSpeechRecognition();
+
   // Update input field with transcript when voice input changes
   useEffect(() => {
-    if (input) {
-      setInput(input);
+    if (transcript) {
+      setInput(transcript);
     }
-  }, [input]);
+  }, [transcript]);
 
   // Handle voice send
   const handleVoiceSend = () => {
@@ -137,28 +141,31 @@ export default function Chat() {
     // Add user message to chat
     const userMessage = { type: 'user' as const, content: input };
     setMessages(prev => [...prev, userMessage]);
+    const currentInput = input; // Capture current input before clearing
     setInput('');
+    if(listening) {
+        resetTranscript(); // Clear transcript after sending if it was voice input
+    }
     setIsLoading(true);
 
     try {
       // Convert messages to the format expected by the backend
-      const apiMessages = messages.map(msg => [
-        msg.type === 'user' ? 'human' : 'ai',
-        msg.content
-      ]);
-
-      // Add the new user message
-      apiMessages.push(['human', userMessage.content]);
-
+      const historyMessages = messages.length > 1 || messages[0].content !== 'Hello! I can help you with SWOT, TOWS, and PESTLE analysis. What would you like to analyze today?' 
+        ? messages.map(msg => [
+            msg.type === 'user' ? 'human' : 'ai', 
+            msg.content
+          ])
+        : [];
+      
       // Call the backend API
-      const response = await fetch('http://127.0.0.1:8000/analyze', {
+      const response = await fetch(`${API_BASE_URL}/analyze`, { // Used API_BASE_URL
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          messages: apiMessages,
-          user_input: userMessage.content
+          messages: historyMessages, // Send the processed history
+          user_input: currentInput // Send the captured current input
         }),
       });
 
@@ -167,7 +174,7 @@ export default function Chat() {
       }
 
       const data: AnalysisResponse = await response.json();
-
+      
       // Add bot response to chat
       setMessages(prev => [...prev, {
         type: 'bot',
@@ -185,7 +192,7 @@ export default function Chat() {
     } finally {
       setIsLoading(false);
     }
-  }
+  };
 
   const toggleSpeech = (index: number, text: string) => {
     if (speakingId === index) {
@@ -237,6 +244,12 @@ export default function Chat() {
   // Mark component as mounted to avoid SSR hydration issues
   useEffect(() => {
     setMounted(true);
+    // Ensure voices are loaded for speech synthesis
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices(); // Warm up and load voices
+      };
+    }
   }, []);
 
   // Only render the full component after client-side hydration
