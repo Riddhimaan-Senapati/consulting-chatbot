@@ -1,3 +1,4 @@
+#main.py
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from fastapi import FastAPI, Body, Response, Query
@@ -15,6 +16,7 @@ import pandas as pd
 from fpdf import FPDF 
 from passlib.context import CryptContext
 from fastapi import HTTPException
+from datetime import datetime # Added datetime import
 
 app = FastAPI()
 # Added CORS middleware
@@ -32,6 +34,7 @@ client = motor.motor_asyncio.AsyncIOMotorClient(os.getenv("MONGODB_URL"))
 db = client.Consulting_data
 discussion_collection = db.get_collection("Discussion_data")
 user_collection = db.get_collection("User_data")
+plans_collection = db.get_collection("plans_data") # New collection for plans
 
 # Represents an ObjectId field in the database.
 # It will be represented as a `str` on the model so that it can be serialized to JSON.
@@ -57,6 +60,33 @@ class User(BaseModel):
     id: Optional[PyObjectId] = Field(alias="_id", default=None)
     email: EmailStr
     password: str
+
+# Pydantic models for Plans
+class Plan(BaseModel):
+    id: Optional[PyObjectId] = Field(alias="_id", default=None)
+    title: str = Field(...)
+    description: str = Field(...)
+    status: str = Field(...)  # e.g., "todo", "inprogress", "done"
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = {
+        "json_encoders": {ObjectId: str},
+        "arbitrary_types_allowed": True,
+        "populate_by_name": True,
+    }
+
+class PlanCreate(BaseModel):
+    title: str = Field(...)
+    description: str = Field(...)
+    status: str = Field(...)
+
+class PlanUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+    # updated_at will be set by the server, so not included here for client input
+
 
 #status check API route
 @app.get("/")
@@ -157,6 +187,79 @@ async def login(user: User):
         raise HTTPException(status_code=400, detail="Incorrect password")
 
     return {"message": "Login successful", "user_id": str(existing_user["_id"])}
+
+# --- CRUD Endpoints for Plans ---
+
+@app.post("/plans/", response_model=Plan)
+async def create_plan(plan_data: PlanCreate = Body(...)):
+    plan_dict = plan_data.model_dump()
+    plan_dict["created_at"] = datetime.utcnow()
+    plan_dict["updated_at"] = datetime.utcnow()
+    
+    new_plan = await plans_collection.insert_one(plan_dict)
+    created_plan_doc = await plans_collection.find_one({"_id": new_plan.inserted_id})
+    if created_plan_doc:
+        return Plan(**created_plan_doc)
+    raise HTTPException(status_code=500, detail="Failed to create plan")
+
+@app.get("/plans/", response_model=List[Plan])
+async def get_all_plans():
+    plans = []
+    async for plan_doc in plans_collection.find().sort("created_at", -1): # Sort by newest first
+        plans.append(Plan(**plan_doc))
+    return plans
+
+@app.get("/plans/{plan_id}", response_model=Plan)
+async def get_plan(plan_id: str):
+    try:
+        obj_id = ObjectId(plan_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid Plan ID format")
+    
+    plan_doc = await plans_collection.find_one({"_id": obj_id})
+    if plan_doc:
+        return Plan(**plan_doc)
+    raise HTTPException(status_code=404, detail=f"Plan with id {plan_id} not found")
+
+@app.put("/plans/{plan_id}", response_model=Plan)
+async def update_plan(plan_id: str, plan_update_data: PlanUpdate = Body(...)):
+    try:
+        obj_id = ObjectId(plan_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid Plan ID format")
+
+    update_data = plan_update_data.model_dump(exclude_unset=True, exclude_none=True) 
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No update data provided")
+        
+    update_data["updated_at"] = datetime.utcnow()
+
+    result = await plans_collection.update_one(
+        {"_id": obj_id},
+        {"$set": update_data}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail=f"Plan with id {plan_id} not found")
+    
+    updated_plan_doc = await plans_collection.find_one({"_id": obj_id})
+    if updated_plan_doc:
+        return Plan(**updated_plan_doc)
+    # This case should ideally not be reached if update was successful
+    raise HTTPException(status_code=500, detail="Failed to retrieve updated plan")
+
+@app.delete("/plans/{plan_id}", response_model=dict)
+async def delete_plan(plan_id: str):
+    try:
+        obj_id = ObjectId(plan_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid Plan ID format")
+        
+    result = await plans_collection.delete_one({"_id": obj_id})
+    if result.deleted_count == 1:
+        return {"message": f"Plan {plan_id} deleted successfully"}
+    raise HTTPException(status_code=404, detail=f"Plan with id {plan_id} not found")
+
 
 if __name__ == "__main__":
     import uvicorn
