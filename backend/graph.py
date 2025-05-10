@@ -84,7 +84,7 @@ def initialize_workflow():
     # Define analysis functions
     def analysis_node_factory(analysis_type: str):
         def analysis_node(state):
-            query = f"{analysis_type} analysis of {state['messages'][-1][1]} 2025"
+            query = f"{analysis_type} analysis of {state['input']} 2025"
             results = search_tool.invoke(query)
             
             # Create detailed instructions based on analysis type
