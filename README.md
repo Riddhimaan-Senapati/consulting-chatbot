@@ -63,3 +63,7 @@ Hiring business consultants can be **expensive** and often out of reach for smal
    cd consulting-chatbot/frontend
    # Follow the instructions in the frontend README
    ```
+4. Or if you have docker installed then run the following command in the main repo:
+   ```sh
+   docker-compose up-build
+   ```
