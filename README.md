@@ -52,18 +52,18 @@ Hiring business consultants can be **expensive** and often out of reach for smal
    git clone https://github.com/Riddhimaan-Senapati/consulting-chatbot.git
    ```
 
-2. Navigate to the backend directory and follow the instructions in the [backend README](https://github.com/Riddhimaan-Senapati/consulting-chatbot/blob/main/backend/README.md):
+2. Navigate to the backend directory and follow the instructions in the [backend README](backend/README.md):
    ```sh
    cd consulting-chatbot/backend
    # Follow the instructions in the backend README
    ```
 
-3. Open another terminal window, navigate to the frontend directory, and follow the instructions in the [frontend README](https://github.com/Riddhimaan-Senapati/consulting-chatbot/blob/main/frontend/README.md):
+3. Open another terminal window, navigate to the frontend directory, and follow the instructions in the [frontend README](frontend/README.md):
    ```sh
    cd consulting-chatbot/frontend
    # Follow the instructions in the frontend README
    ```
 4. Or if you have docker installed then run the following command in the main repo:
    ```sh
-   docker-compose up-build
+   docker-compose up --build
    ```

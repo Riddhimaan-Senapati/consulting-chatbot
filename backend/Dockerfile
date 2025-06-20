@@ -1,11 +1,21 @@
 FROM python:3.12-alpine
 
+# Install build dependencies
+RUN apk add --no-cache gcc musl-dev libffi-dev
+
+# Install Poetry
+RUN pip install --no-cache-dir poetry
+
 WORKDIR /app
 
-COPY requirements.txt .
+# Copy only the dependency files first for better caching
+COPY pyproject.toml poetry.lock* ./
 
-RUN pip install --no-cache-dir -r requirements.txt
+# Install dependencies (no virtualenv, install to system)
+RUN poetry config virtualenvs.create false \
+    && poetry install --no-interaction --no-ansi
 
+# Copy the rest of the application code
 COPY . .
 
 EXPOSE 8000

@@ -1,0 +1,37 @@
+[project]
+name = "backend for consulting chatbot"
+version = "0.1.0"
+description = "backend for consulting chatbot"
+authors = [
+    {name = "Riddhimaan Senapati",email = "rsenapati@umass.edu"},
+    {name = "Dhumravarna Ambre",email = "dambre@umass.edu"},
+    {name = "Isaac Santana",email = "isantana@umass.edu"}
+]
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "pytest (>=8.4.1,<9.0.0)",
+    "fastapi[standard] (>=0.115.13,<0.116.0)",
+    "bson (>=0.5.10,<0.6.0)",
+    "passlib (>=1.7.4,<2.0.0)",
+    "datetime (>=5.5,<6.0)",
+    "langgraph (>=0.4.8,<0.5.0)",
+    "langchain-community (>=0.3.25,<0.4.0)",
+    "langchain-google-genai (>=2.1.5,<3.0.0)",
+    "pydantic (>=2.11.7,<3.0.0)",
+    "motor (>=3.7.1,<4.0.0)",
+    "uvicorn (>=0.34.3,<0.35.0)",
+    "pandas (>=2.3.0,<3.0.0)",
+    "fpdf (>=1.7.2,<2.0.0)",
+    "bcrypt (>=4.3.0,<5.0.0)"
+]
+
+[tool.poetry]
+name = "backend"
+packages = [{ include = "." }]
+package-mode = false
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
