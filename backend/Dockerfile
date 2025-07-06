@@ -3,16 +3,13 @@ FROM python:3.12-alpine
 # Install build dependencies
 RUN apk add --no-cache gcc musl-dev libffi-dev
 
-# Install uv
-RUN pip install --no-cache-dir uv
-
 WORKDIR /app
 
-# Copy only the dependency files first for better caching
-COPY pyproject.toml uv.lock* ./
+# Copy all files
+COPY . .
 
-# Install dependencies
-RUN uv pip install --system -e .
+# Install dependencies directly with pip
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code
 COPY . .
