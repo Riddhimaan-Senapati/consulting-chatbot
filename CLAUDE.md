@@ -12,7 +12,7 @@ sourced real-time data.
 - Backend: FastAPI + LangGraph + Google Gemini AI + Tavily Search
 - Frontend: Next.js 15 (React 19, TypeScript, Tailwind CSS, shadcn/ui)
 - Database: MongoDB (via Motor async driver)
-- Deployment: Docker Compose
+- Deployment: Docker Compose (local), Vercel (production)
 
 ## Development Commands
 
@@ -86,6 +86,32 @@ docker-compose up --build
 
 Note: Ensure `backend/.env` exists before running docker-compose (the .env file is volume-mounted).
 
+### Vercel (Production Deployment)
+
+**Frontend Deployment:**
+```bash
+cd frontend
+npx vercel deploy --prod --yes
+# Production URL: https://consulting-chatbot.vercel.app
+```
+
+**Backend Deployment:**
+```bash
+cd backend
+npx vercel deploy --prod --yes
+# Production URL: https://consulting-chatbot-backend.vercel.app
+# API Docs: https://consulting-chatbot-backend.vercel.app/docs
+```
+
+**Environment Variables:**
+Set these in Vercel dashboard for each project:
+- **Backend**: `MONGODB_URL`, `TAVILY_API_KEY`, `GOOGLE_API_KEY`
+- **Frontend**: `NEXT_PUBLIC_API_URL` (points to backend URL)
+
+**Vercel Projects:**
+- Frontend: https://vercel.com/riddhimaan-senapatis-projects/consulting-chatbot
+- Backend: https://vercel.com/riddhimaan-senapatis-projects/consulting-chatbot-backend
+
 ## Architecture
 
 ### Backend Architecture (FastAPI + LangGraph)
@@ -94,6 +120,7 @@ Note: Ensure `backend/.env` exists before running docker-compose (the .env file 
 - `main.py` - FastAPI app with routes, MongoDB integration, CORS, authentication
 - `graph.py` - LangGraph workflow for routing and executing analyses
 - `test_main.py` - Test suite with mocked database and LLM
+- `vercel.json` - Vercel serverless deployment configuration
 
 **LangGraph Workflow (`graph.py`):**
 
@@ -207,6 +234,64 @@ The system uses a `StateGraph` with conditional routing based on user input:
 - `.dockerignore` files exist to speed up builds
 - Backend `.env` is volume-mounted (not copied into image)
 
+### Vercel Serverless Architecture
+
+**Lazy Initialization Pattern:**
+The backend uses lazy initialization for serverless environments (Vercel) because:
+- Serverless functions are **stateless** and **ephemeral**
+- Traditional startup events (`@app.on_event("startup")`) may not execute reliably
+- Connections must be initialized on-demand, not at module import time
+
+**LangGraph Workflow (main.py:53-57):**
+```python
+analysis_chain = None  # Don't initialize at module level
+
+def get_analysis_chain():
+    global analysis_chain
+    if analysis_chain is None:
+        analysis_chain = initialize_workflow()  # Initialize on first use
+    return analysis_chain
+```
+
+**MongoDB Connection (main.py:44-62):**
+```python
+_client = None  # Global connection pool
+
+def get_db_collections():
+    global _client, _db, _discussion_collection, _user_collection, _plans_collection
+    if _client is None:
+        mongodb_url = os.getenv("MONGODB_URL")
+        _client = motor.motor_asyncio.AsyncIOMotorClient(mongodb_url)
+        _db = _client.Consulting_data
+        _discussion_collection = _db.get_collection("Discussion_data")
+        _user_collection = _db.get_collection("User_data")
+        _plans_collection = _db.get_collection("plans_data")
+    return _discussion_collection, _user_collection, _plans_collection
+```
+
+**Why This Works:**
+- Motor automatically manages connection pooling internally
+- Lazy initialization ensures connections are created only when needed
+- Each serverless invocation gets a fresh or pooled connection
+- No explicit cleanup required - Motor handles it automatically
+
+**Usage in Endpoints:**
+All endpoints call `get_db_collections()` to retrieve collections:
+```python
+@app.get("/plans/")
+async def get_all_plans():
+    _, _, plans_collection = get_db_collections()  # Lazy load
+    plans = []
+    async for plan_doc in plans_collection.find().sort("created_at", -1):
+        plans.append(Plan(**plan_doc))
+    return plans
+```
+
+**PDF Generation for Serverless:**
+- Uses `/tmp` directory (writable in serverless)
+- Fonts are included via `vercel.json` config: `"includeFiles": "fonts/**"`
+- Files are cleaned up automatically when function terminates
+
 ## Common Pitfalls
 
 1. **Environment Variables:** Always ensure `backend/.env` exists with required API keys (MONGODB_URL, TAVILY_API_KEY, GOOGLE_API_KEY) before running backend or docker-compose.
@@ -222,3 +307,153 @@ The system uses a `StateGraph` with conditional routing based on user input:
 6. **Plans Board:** Frontend uses drag-and-drop. Status values must match backend: "todo", "inprogress", "done".
 
 7. **Testing:** Tests stub out LLM and database - don't expect real AI responses in test environment.
+
+8. **Vercel Serverless:** Lazy initialization is critical for serverless. Never initialize connections or heavy resources at module level - always use getter functions that initialize on first use.
+
+## Troubleshooting
+
+### MongoDB Connection Issues
+
+**Symptom:** `Internal Server Error` on database operations, or DNS error:
+```
+The DNS query name does not exist: _mongodb._tcp.cluster0.xxxxx.mongodb.net.
+```
+
+**Solutions:**
+
+1. **Verify MongoDB Atlas Cluster:**
+   - Go to https://cloud.mongodb.com
+   - Ensure cluster exists and is running (not paused)
+   - Check cluster name matches `MONGODB_URL`
+
+2. **Configure Network Access:**
+   - MongoDB Atlas → Network Access
+   - Add IP whitelist entry: `0.0.0.0/0` (allow all - recommended for Vercel serverless)
+   - Or add specific Vercel IP ranges
+
+3. **Verify Connection String Format:**
+   ```
+   mongodb+srv://username:password@cluster0.xxxxx.mongodb.net/database?retryWrites=true&w=majority
+   ```
+   - Use `mongodb+srv://` protocol
+   - Include username, password, cluster domain
+   - Add query parameters for connection options
+
+4. **Update Vercel Environment Variable:**
+   - Backend project settings → Environment Variables
+   - Update `MONGODB_URL` with correct connection string
+   - Redeploy: `cd backend && npx vercel deploy --prod --yes`
+
+5. **Test Connection Locally:**
+   ```bash
+   cd backend
+   uv run python -c "from motor.motor_asyncio import AsyncIOMotorClient; import os; from dotenv import load_dotenv; load_dotenv(); client = AsyncIOMotorClient(os.getenv('MONGODB_URL')); print('Connected:', client.server_info())"
+   ```
+
+### Google Gemini API Quota Exceeded
+
+**Symptom:** `/analyze/` endpoint returns 429 error:
+```
+Analysis failed: 429 You exceeded your current quota
+```
+
+**Solutions:**
+
+1. **Check API Usage:**
+   - Visit: https://ai.google.dev/gemini-api/docs/rate-limits
+   - Monitor usage: https://ai.dev/usage?tab=rate-limit
+
+2. **Wait for Quota Reset:**
+   - Free tier quotas reset daily
+   - Error message shows retry delay (e.g., "retry in 30s")
+
+3. **Upgrade API Plan:**
+   - Go to Google AI Studio and upgrade to paid tier
+   - Provides higher rate limits and request quotas
+
+4. **Switch Model (Temporary):**
+   - Edit `backend/graph.py` line 16:
+   ```python
+   llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash")  # Lower quota usage
+   ```
+   - Redeploy backend
+
+### Vercel Deployment Failures
+
+**Symptom:** Build fails or functions timeout
+
+**Solutions:**
+
+1. **Check Build Logs:**
+   - Vercel dashboard → Deployments → Click deployment
+   - View build and function logs for errors
+
+2. **Verify Dependencies:**
+   - Ensure `requirements.txt` includes all packages
+   - Check `pyproject.toml` matches `requirements.txt`
+
+3. **Check Function Size:**
+   - Vercel functions have size limits (50MB)
+   - If exceeded, optimize dependencies or use external services
+
+4. **Environment Variables:**
+   - Verify all required env vars are set in Vercel dashboard
+   - Check for typos in variable names
+
+5. **Test Endpoint Health:**
+   ```bash
+   curl https://consulting-chatbot-backend.vercel.app/
+   # Should return: {"status":"active","version":"1.0.0"}
+   ```
+
+### Frontend Not Connecting to Backend
+
+**Symptom:** Frontend shows connection errors
+
+**Solutions:**
+
+1. **Verify Backend URL:**
+   - Check `NEXT_PUBLIC_API_URL` in Vercel frontend settings
+   - Should be: `https://consulting-chatbot-backend.vercel.app`
+
+2. **Check CORS Configuration:**
+   - Backend `main.py` must allow frontend domain
+   - Current allowed origins in `main.py:25-30`:
+     ```python
+     allow_origins=[
+         "http://localhost:3000",
+         "https://consulting-chatbot.vercel.app",
+         "https://consulting-chatbot-riddhimaan-senapatis-projects.vercel.app",
+         "https://*.vercel.app"
+     ]
+     ```
+
+3. **Test Backend Directly:**
+   ```bash
+   curl https://consulting-chatbot-backend.vercel.app/
+   ```
+
+4. **Check Browser Console:**
+   - Open DevTools → Console/Network tabs
+   - Look for CORS errors or 404/500 responses
+
+### PDF Download Not Working
+
+**Symptom:** `/download/` endpoint fails or returns empty file
+
+**Solutions:**
+
+1. **Verify Font Files:**
+   - Check `backend/fonts/NotoSans-Regular.ttf` exists
+   - Confirm `vercel.json` includes: `"includeFiles": "fonts/**"`
+
+2. **Check Chat History:**
+   - PDF requires existing chat in `Discussion_data` collection
+   - Run a chat analysis first to populate database
+
+3. **Test Locally:**
+   ```bash
+   cd backend
+   uv run uvicorn main:app --reload
+   # Test: http://localhost:8000/download/
+   ```
