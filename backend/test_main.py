@@ -18,8 +18,11 @@ def patch_analysis_chain(monkeypatch):
     """
     Stub out the LLM workflow so analyze/ always returns a fixed assistant reply.
     """
-    fake = {"messages":[("system","OK"),("user","X"),("assistant","Reply [src]")]}
-    monkeypatch.setattr(main.analysis_chain, "invoke", lambda state: fake)
+    class FakeChain:
+        def invoke(self, state):
+            return {"messages":[("system","OK"),("user","X"),("assistant","Reply [src]")]}
+
+    monkeypatch.setattr(main, "get_analysis_chain", lambda: FakeChain())
     yield
 
 class AsyncIterator:

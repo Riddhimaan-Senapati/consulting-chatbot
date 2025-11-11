@@ -33,13 +33,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Connecting to MongoDB Database
+# Connecting to MongoDB Database - using lazy initialization for serverless
 load_dotenv()
-client = motor.motor_asyncio.AsyncIOMotorClient(os.getenv("MONGODB_URL"))
-db = client.Consulting_data
-discussion_collection = db.get_collection("Discussion_data")
-user_collection = db.get_collection("User_data")
-plans_collection = db.get_collection("plans_data") # New collection for plans
+_client = None
+_db = None
+_discussion_collection = None
+_user_collection = None
+_plans_collection = None
+
+def get_db_collections():
+    """Lazy initialization of database connection for serverless environment"""
+    global _client, _db, _discussion_collection, _user_collection, _plans_collection
+
+    if _client is None:
+        try:
+            mongodb_url = os.getenv("MONGODB_URL")
+            if not mongodb_url:
+                raise ValueError("MONGODB_URL environment variable not set")
+            _client = motor.motor_asyncio.AsyncIOMotorClient(mongodb_url)
+            _db = _client.Consulting_data
+            _discussion_collection = _db.get_collection("Discussion_data")
+            _user_collection = _db.get_collection("User_data")
+            _plans_collection = _db.get_collection("plans_data")
+        except Exception as e:
+            print(f"Error connecting to MongoDB: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Database connection failed: {str(e)}")
+
+    return _discussion_collection, _user_collection, _plans_collection
 
 # Represents an ObjectId field in the database.
 # It will be represented as a `str` on the model so that it can be serialized to JSON.
@@ -47,7 +67,18 @@ PyObjectId = Annotated[str, BeforeValidator(str)]
 
 #chain that calls the LLM. Note: This is because of Langgraph that we are using in
 #graph.py which requires this to be a chain
-analysis_chain = initialize_workflow()
+# Use lazy initialization for serverless environment
+analysis_chain = None
+
+def get_analysis_chain():
+    global analysis_chain
+    if analysis_chain is None:
+        try:
+            analysis_chain = initialize_workflow()
+        except Exception as e:
+            print(f"Error initializing workflow: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to initialize workflow: {str(e)}")
+    return analysis_chain
 
 #MongoDb classes for Requests, Responses and users
 class AnalysisRequest(BaseModel):
@@ -98,9 +129,19 @@ class PlanUpdate(BaseModel):
 async def health_check():
     return {"status": "active", "version": "1.0.0"}
 
+@app.get("/test-env")
+async def test_env():
+    """Test endpoint to check environment variables"""
+    mongodb_url = os.getenv("MONGODB_URL")
+    return {
+        "mongodb_url_set": mongodb_url is not None,
+        "mongodb_url_length": len(mongodb_url) if mongodb_url else 0
+    }
+
 #API for downloading the chats
 @app.get("/download/")
 async def download_analysis(format: str = Query("pdf")):
+    discussion_collection, _, _ = get_db_collections()
     # Fetch analysis report from MongoDB
     # obj_id = ObjectId(item_id)
     download_chat = await discussion_collection.find_one(sort=[("_id", -1)])
@@ -137,11 +178,16 @@ async def download_analysis(format: str = Query("pdf")):
 # main API for communicating with the LLM and storing it in the database
 @app.post("/analyze/", response_model = AnalysisResponse)
 async def analyze(request: AnalysisRequest = Body(...)):
-    state = {
-        "messages": request.messages,
-        "input": request.user_input
-    }
-    result = analysis_chain.invoke(state)
+    try:
+        state = {
+            "messages": request.messages,
+            "input": request.user_input
+        }
+        chain = get_analysis_chain()
+        result = chain.invoke(state)
+    except Exception as e:
+        print(f"Error in analyze endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
     print("Debug - Result:", result)  # Debugging line => I am not getting the "response" from here
 
@@ -153,9 +199,10 @@ async def analyze(request: AnalysisRequest = Body(...)):
         "full_history": request.messages + [(request.user_input, result["messages"][-1][1])]
     }
     print("Final Result:", final_data)  # Debugging line
-    # Send result data to the Db  
+    # Send result data to the Db
+    discussion_collection, _, _ = get_db_collections()
     new_resp = await discussion_collection.insert_one(final_data)
-      
+
     #Fetch data from Db
     result_chat = await discussion_collection.find_one( {"_id": new_resp.inserted_id})
 
@@ -171,6 +218,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # API for signup
 @app.post("/auth/signup")
 async def signup(user: User):
+    _, user_collection, _ = get_db_collections()
     # Check if user already exists
     existing_user = await user_collection.find_one({"email": user.email})
     if existing_user:
@@ -189,6 +237,7 @@ async def signup(user: User):
 #API for Login
 @app.post("/auth/login")
 async def login(user: User):
+    _, user_collection, _ = get_db_collections()
     existing_user = await user_collection.find_one({"email": user.email})
     if not existing_user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -202,10 +251,11 @@ async def login(user: User):
 
 @app.post("/plans/", response_model=Plan)
 async def create_plan(plan_data: PlanCreate = Body(...)):
+    _, _, plans_collection = get_db_collections()
     plan_dict = plan_data.model_dump()
     plan_dict["created_at"] = datetime.utcnow()
     plan_dict["updated_at"] = datetime.utcnow()
-    
+
     new_plan = await plans_collection.insert_one(plan_dict)
     created_plan_doc = await plans_collection.find_one({"_id": new_plan.inserted_id})
     if created_plan_doc:
@@ -214,18 +264,26 @@ async def create_plan(plan_data: PlanCreate = Body(...)):
 
 @app.get("/plans/", response_model=List[Plan])
 async def get_all_plans():
-    plans = []
-    async for plan_doc in plans_collection.find().sort("created_at", -1): # Sort by newest first
-        plans.append(Plan(**plan_doc))
-    return plans
+    try:
+        _, _, plans_collection = get_db_collections()
+        plans = []
+        async for plan_doc in plans_collection.find().sort("created_at", -1): # Sort by newest first
+            plans.append(Plan(**plan_doc))
+        return plans
+    except Exception as e:
+        print(f"Error in get_all_plans: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to fetch plans: {str(e)}")
 
 @app.get("/plans/{plan_id}", response_model=Plan)
 async def get_plan(plan_id: str):
+    _, _, plans_collection = get_db_collections()
     try:
         obj_id = ObjectId(plan_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid Plan ID format")
-    
+
     plan_doc = await plans_collection.find_one({"_id": obj_id})
     if plan_doc:
         return Plan(**plan_doc)
@@ -233,15 +291,16 @@ async def get_plan(plan_id: str):
 
 @app.put("/plans/{plan_id}", response_model=Plan)
 async def update_plan(plan_id: str, plan_update_data: PlanUpdate = Body(...)):
+    _, _, plans_collection = get_db_collections()
     try:
         obj_id = ObjectId(plan_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid Plan ID format")
 
-    update_data = plan_update_data.model_dump(exclude_unset=True, exclude_none=True) 
+    update_data = plan_update_data.model_dump(exclude_unset=True, exclude_none=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No update data provided")
-        
+
     update_data["updated_at"] = datetime.utcnow()
 
     result = await plans_collection.update_one(
@@ -251,7 +310,7 @@ async def update_plan(plan_id: str, plan_update_data: PlanUpdate = Body(...)):
 
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail=f"Plan with id {plan_id} not found")
-    
+
     updated_plan_doc = await plans_collection.find_one({"_id": obj_id})
     if updated_plan_doc:
         return Plan(**updated_plan_doc)
@@ -260,11 +319,12 @@ async def update_plan(plan_id: str, plan_update_data: PlanUpdate = Body(...)):
 
 @app.delete("/plans/{plan_id}", response_model=dict)
 async def delete_plan(plan_id: str):
+    _, _, plans_collection = get_db_collections()
     try:
         obj_id = ObjectId(plan_id)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid Plan ID format")
-        
+
     result = await plans_collection.delete_one({"_id": obj_id})
     if result.deleted_count == 1:
         return {"message": f"Plan {plan_id} deleted successfully"}
