@@ -26,7 +26,7 @@ interface AnalysisResponse {
   full_history: [string, string][];
 }
 
-const API_BASE_URL = 'http://127.0.0.1:8000'; // Added API_BASE_URL
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'; // Added API_BASE_URL
 
 export default function Chat() {
   const [mounted, setMounted] = useState(false);
@@ -74,7 +74,7 @@ export default function Chat() {
     // send get request "/download" to get collection from database
 
     try{
-      const response = await fetch('http://127.0.0.1:8000/download', {
+      const response = await fetch(`${API_BASE_URL}/download`, {
         method: 'GET',
         headers: {
           'Accept': 'application/pdf'
@@ -105,7 +105,7 @@ export default function Chat() {
     ] as [string, string]);
     historyForApi.push(['human', userMessageToRerun.content]);
     try {
-      const response = await fetch('http://127.0.0.1:8000/analyze', {
+      const response = await fetch(`${API_BASE_URL}/analyze`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

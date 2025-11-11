@@ -22,7 +22,12 @@ app = FastAPI()
 # Added CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Update with the frontend URL
+    allow_origins=[
+        "http://localhost:3000",
+        "https://consulting-chatbot.vercel.app",
+        "https://consulting-chatbot-riddhimaan-senapatis-projects.vercel.app",
+        "https://*.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -107,22 +112,27 @@ async def download_analysis(format: str = Query("pdf")):
     messages = download_chat.get("full_history", [])
     analysis_text = "\n".join([f"{msg[0]}: {msg[1]}" for msg in messages])
 
-    # Define file paths
-    file_path = f"analysis_report.{format}"
+    # Define file paths - use /tmp for serverless environment
+    import tempfile
+    temp_dir = tempfile.gettempdir()
+    file_path = os.path.join(temp_dir, f"analysis_report.{format}")
 
     # Generate PDF
     if format == "pdf":
         pdf = FPDF()
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
-        pdf.add_font("NotoSans", "", "fonts/NotoSans-Regular.ttf", uni=True)
+        # Get the absolute path to fonts directory
+        fonts_dir = os.path.join(os.path.dirname(__file__), "fonts")
+        font_path = os.path.join(fonts_dir, "NotoSans-Regular.ttf")
+        pdf.add_font("NotoSans", "", font_path, uni=True)
         pdf.set_font("NotoSans", size=12)
         pdf.multi_cell(0, 10, analysis_text)
         pdf.output(file_path)
-    
+
 
     # Return file as response
-    return FileResponse(path=file_path, filename=file_path, media_type="application/octet-stream")
+    return FileResponse(path=file_path, filename=f"analysis_report.{format}", media_type="application/octet-stream")
 
 # main API for communicating with the LLM and storing it in the database
 @app.post("/analyze/", response_model = AnalysisResponse)
